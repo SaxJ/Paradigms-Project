@@ -125,8 +125,9 @@ let rec expSize = function A|B -> 1
 type Map = exp * (exp ref)
 
 let rec unify (set, vari) =
+    let map = Collections.Map.empty
     match set, vari with
-        | x, Var xx -> (x, ref xx) :: []
+        | x, Var xx ->  (x, ref xx) :: []
         | Mix(a,b),Mix(Var aa, Var bb) -> unify (a, Var aa) @ unify (b, Var bb) 
         | Mix(a,b),Mix(Var aa, bb) | Mix(b,a),Mix(bb, Var aa) -> match (b,bb) with
                                                                     | (Mix(_,_),Mix(_, _)) -> (a, ref aa) :: unify(b, bb)
@@ -136,7 +137,17 @@ let rec unify (set, vari) =
         | Mix(a,b),Mix(aa,bb) -> unify (a, aa) @ unify (b, bb) 
         | (_,_) -> []
 
-let (%=) = unify
+let fullyUnify (set, vari) =
+    let initial = unify(set, vari)
+    let rec loop lst =
+        match lst with
+         | [] -> Map.empty
+         | (a, b) :: t -> if Map.containsKey !b (loop t) then
+                            if a <> Map.find !b (loop t) then Map.empty
+                            else (loop t)
+                          else Map.add(!b) a (loop t)
+    loop initial
+                          
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let suffices rules (exp1, exp2) = false  // You'll need to implement this properly!
