@@ -122,6 +122,20 @@ let rec expSize = function A|B -> 1
 /////////////////////////////////////////////////                        
 /////  Put your code for the first part here                         
 /////////////////////////////////////////////////
+type Map = exp * (exp ref)
+
+let rec unify (set, vari) =
+    match set, vari with
+        | x, Var xx -> (x, ref xx) :: []
+        | Mix(a,b),Mix(Var aa, Var bb) -> unify (a, Var aa) @ unify (b, Var bb) 
+        | Mix(a,b),Mix(Var aa, bb) | Mix(b,a),Mix(bb, Var aa) -> match (b,bb) with
+                                                                    | (Mix(_,_),Mix(_, _)) -> (a, ref aa) :: unify(b, bb)
+                                                                    | (A,A) -> (a, ref aa) :: []
+                                                                    | (B,B) -> (a, ref aa) :: []
+                                                                    | (_,_) -> []
+        | Mix(a,b),Mix(aa,bb) -> unify (a, aa) @ unify (b, bb) 
+        | (_,_) -> []
+
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let suffices rules (exp1, exp2) = false  // You'll need to implement this properly!
