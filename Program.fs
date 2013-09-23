@@ -136,6 +136,7 @@ let rec unify (set, vari) =
         | Mix(a,b),Mix(aa,bb) -> unify (a, aa) @ unify (b, bb) 
         | (_,_) -> []
 
+let (%=) = unify
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let suffices rules (exp1, exp2) = false  // You'll need to implement this properly!
