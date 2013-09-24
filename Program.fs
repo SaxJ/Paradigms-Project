@@ -173,7 +173,21 @@ let sufficeMapping ((a,b), (c,d)) =
     else mapJoin (leftMap,rightMap)
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
-let suffices rules (exp1, exp2) = false
+let rec suffices rules (exp1, exp2) =
+    let mapList = [ for (x,y) in rules do
+                        let m = sufficeMapping ((exp1,exp2),x)
+                        if not (Map.isEmpty m) then yield (m,y)]
+    match mapList with 
+        | [] -> false
+        | _ -> List.isEmpty [ for (x,y) in mapList do
+                                 if List.isEmpty y then yield true
+                                 else
+                                    let lst = subst2 x y
+                                    let booleanList = [ for a in lst do
+                                                            if suffices rules a then yield true ]
+                                    if not(List.isEmpty booleanList) then yield true ]
+
+
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
