@@ -147,9 +147,16 @@ let fullyUnify (set, vari) =
                             else (loop t)
                           else Map.add(!b) a (loop t)
     loop initial
-                          
-let substitute map exps:(sufficency list) =
-    [for (Var exp1, Var exp2) in exps do yield (Map.find(exp1) map, Map.find(exp2) map)]
+
+
+let rec subst1 (map, exp) = 
+    match exp with
+    | Var x -> if(Map.containsKey(x) map) then
+                    Map.find(x) map
+               else
+                    Var x          
+    | Mix(x, y) -> Mix( subst1(map, x), subst1(map, y))
+    | a -> a                                                    
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let suffices rules (exp1, exp2) = false  // You'll need to implement this properly!
