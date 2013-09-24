@@ -156,6 +156,21 @@ let fullyUnify (set, vari) =
                           else Map.add(!b) a (loop t)
     loop initial
 
+let funify (set, vari) =
+    let rec loop lst = 
+        match lst with
+            | [] -> Some Map.empty
+            | (v, k) :: t -> let tail = loop t
+                             match tail with
+                                | None -> None
+                                | Some m -> if Map.containsKey !k m then
+                                                if v <> Map.find !k m then None
+                                                else Some m
+                                            else Some( Map.add(!k) v m )
+    match unify(set,vari) with
+        | None -> None
+        | Some [] -> Some(Map.empty)
+        | Some l ->  loop l
 
 let rec subst1 (map, exp) = 
     match exp with
