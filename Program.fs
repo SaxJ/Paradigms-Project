@@ -174,7 +174,7 @@ let sufficeMapping ((a,b), (c,d)) =
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let rec suffices rules (exp1, exp2) =
-    let mapList = [ for (x,y) in rules do
+    let mapList = [ for Rule(x,y) in rules do
                         let m = sufficeMapping ((exp1,exp2),x)
                         if not (Map.isEmpty m) then yield (m,y)]
     match mapList with 
