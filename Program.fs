@@ -135,7 +135,7 @@ let rec unify (set, vari) =
                                                                     | (B,B) -> (a, ref aa) :: []
                                                                     | (_,_) -> []
         | Mix(a,b),Mix(aa,bb) -> unify (a, aa) @ unify (b, bb) 
-        | (_,_) -> []
+        | (_,_) -> (vari,ref "exception") :: []
 
 let fullyUnify (set, vari) =
     let initial = unify(set, vari)
@@ -166,10 +166,11 @@ let mapJoin (a,b) =
 
 let sufficeMapping ((a,b), (c,d)) =
     let leftMap = fullyUnify (a,c)
-    let right = substitute leftMap d
-    let rightMap = match right with
-                    | h :: t -> fullyUnify (b, h)
-    mapJoin (leftMap,rightMap)
+    let right = subst1 (leftMap, d)
+    let rightMap = fullyUnify (a, right)
+    if Map.isEmpty leftMap || Map.isEmpty rightMap then
+        Map.empty
+    else mapJoin (leftMap,rightMap)
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let suffices rules (exp1, exp2) = false
