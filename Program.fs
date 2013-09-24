@@ -156,7 +156,10 @@ let rec subst1 (map, exp) =
                else
                     Var x          
     | Mix(x, y) -> Mix( subst1(map, x), subst1(map, y))
-    | a -> a                                                    
+    | a -> a  
+    
+let subst2 (map, exps) =
+    [for (x, y) in exps do yield (subst1(map,x), subst1(map,y))]                                                                                             
 
 let mapJoin (a,b) =
     Collections.Map(Seq.concat [(Map.toSeq a) ; (Map.toSeq b)])
