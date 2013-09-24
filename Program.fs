@@ -158,7 +158,7 @@ let rec subst1 (map, exp) =
     | Mix(x, y) -> Mix( subst1(map, x), subst1(map, y))
     | a -> a  
     
-let subst2 (map, exps) =
+let subst2 map exps:(sufficency list) =
     [for (x, y) in exps do yield (subst1(map,x), subst1(map,y))]                                                                                             
 
 let mapJoin (a,b) =
