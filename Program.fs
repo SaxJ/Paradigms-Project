@@ -127,15 +127,23 @@ type Map = exp * (exp ref)
 let rec unify (set, vari) =
     let map = Collections.Map.empty
     match set, vari with
-        | x, Var xx ->  (x, ref xx) :: []
-        | Mix(a,b),Mix(Var aa, Var bb) -> unify (a, Var aa) @ unify (b, Var bb) 
+        | x, Var xx ->  Some ((x, ref xx) :: [])
+        | Mix(a,b),Mix(Var aa, Var bb) -> match (unify (a, Var aa), unify (b, Var bb)) with
+                                          | None, _ | _, None -> None
+                                          | (Some a, Some b) -> Some(a @ b)
         | Mix(a,b),Mix(Var aa, bb) | Mix(b,a),Mix(bb, Var aa) -> match (b,bb) with
-                                                                    | (Mix(_,_),Mix(_, _)) -> (a, ref aa) :: unify(b, bb)
-                                                                    | (A,A) -> (a, ref aa) :: []
-                                                                    | (B,B) -> (a, ref aa) :: []
-                                                                    | (_,_) -> []
-        | Mix(a,b),Mix(aa,bb) -> unify (a, aa) @ unify (b, bb) 
-        | (_,_) -> (vari,ref "exception") :: []
+                                                                    | (Mix(_,_),Mix(_, _)) -> match unify(b, bb) with
+                                                                                              | None ->  None
+                                                                                              | Some n -> Some( (a, ref aa) :: n )
+                                                                    | (A,A) -> Some( (a, ref aa) :: [] )
+                                                                    | (B,B) -> Some( (a, ref aa) :: [] )
+                                                                    | (_,_) -> Some []
+        | Mix(a,b),Mix(aa,bb) -> match (unify (a, aa), unify (b, bb)) with
+                                 | None, _ | _, None -> None
+                                 | (Some a, Some b) -> Some(a @ b)
+        | (A,A) -> Some []
+        | (B,B) -> Some []
+        | (_,_) -> None
 
 let fullyUnify (set, vari) =
     let initial = unify(set, vari)
