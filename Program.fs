@@ -158,8 +158,18 @@ let rec subst1 (map, exp) =
     | Mix(x, y) -> Mix( subst1(map, x), subst1(map, y))
     | a -> a                                                    
 
+let mapJoin (a,b) =
+    Collections.Map(Seq.concat [(Map.toSeq a) ; (Map.toSeq b)])
+
+let sufficeMapping ((a,b), (c,d)) =
+    let leftMap = fullyUnify (a,c)
+    let right = substitute leftMap d
+    let rightMap = match right with
+                    | h :: t -> fullyUnify (b, h)
+    mapJoin (leftMap,rightMap)
+
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
-let suffices rules (exp1, exp2) = false  // You'll need to implement this properly!
+let suffices rules (exp1, exp2) = false
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
