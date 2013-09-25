@@ -145,17 +145,6 @@ let rec unify (set, vari) =
         | (B,B) -> Some []
         | (_,_) -> None
 
-let fullyUnify (set, vari) =
-    let initial = unify(set, vari)
-    let rec loop lst =
-        match lst with
-         | [] -> Map.empty
-         | (a, b) :: t -> if Map.containsKey !b (loop t) then
-                            if a <> Map.find !b (loop t) then Map.empty
-                            else (loop t)
-                          else Map.add(!b) a (loop t)
-    loop initial
-
 let funify (set, vari) =
     let rec loop lst = 
         match lst with
@@ -196,14 +185,6 @@ let optionSufficeMapping ((a,b),(c,d)) =
                     if rightMap = None then None else
                         let m = Option.get rightMap
                         Some(mapJoin (m,x))
-
-let sufficeMapping ((a,b), (c,d)) =
-    let leftMap = fullyUnify (a,c)
-    let right = subst1 (leftMap, d)
-    let rightMap = fullyUnify (a, right)
-    if Map.isEmpty leftMap || Map.isEmpty rightMap then
-        Map.empty
-    else mapJoin (leftMap,rightMap)
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let rec suffices rules (exp1, exp2) =
