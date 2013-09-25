@@ -186,6 +186,16 @@ let subst2 map exps:(sufficency list) =
 
 let mapJoin (a,b) =
     Collections.Map(Seq.concat [(Map.toSeq a) ; (Map.toSeq b)])
+         
+let optionSufficeMapping ((a,b),(c,d)) =
+    let leftMap = funify (a,c)
+    match leftMap with
+        | None -> None
+        | Some x -> let right = subst1 (x,d)
+                    let rightMap = funify (a, right)
+                    if rightMap = None then None else
+                        let m = Option.get rightMap
+                        Some(mapJoin (m,x))
 
 let sufficeMapping ((a,b), (c,d)) =
     let leftMap = fullyUnify (a,c)
