@@ -191,9 +191,9 @@ let suffices rules (exp1, exp2) =
     let rec internSuff rules (exp1,exp2) map =
         let predicate lst = function x -> let bools = [ for x in lst do if Map.containsKey(x) map then yield true ]
                                           if List.isEmpty bools then
-                                                internSuff rules x (Map.add(x) () map)
+                                                not( internSuff rules x (Map.add(x) () map) )
                                           else
-                                                false
+                                                true
         let ruleEval R =
             match R() with Rule(suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
                                               match m with
@@ -201,8 +201,8 @@ let suffices rules (exp1, exp2) =
                                                   | Some z -> if List.isEmpty lst then true else
                                                                   let sub = subst2 z lst
                                                                   match List.tryFind(predicate sub) sub with
-                                                                      | None -> false
-                                                                      | _ -> true
+                                                                      | None -> true
+                                                                      | _ -> false
         match List.tryFind(ruleEval) rules with
             | None -> false
             | _ -> true
