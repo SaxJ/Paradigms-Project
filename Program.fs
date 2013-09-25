@@ -195,14 +195,14 @@ let suffices rules (exp1, exp2) =
                                           else
                                                 false
         let ruleEval R =
-            match R with (suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
-                                        match m with
-                                            | None -> false
-                                            | Some z -> if List.isEmpty lst then true else
-                                                            let sub = subst2 z lst
-                                                            match List.tryFind(predicate sub) sub with
-                                                                | None -> false
-                                                                | _ -> true
+            match R() with Rule(suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
+                                              match m with
+                                                  | None -> false
+                                                  | Some z -> if List.isEmpty lst then true else
+                                                                  let sub = subst2 z lst
+                                                                  match List.tryFind(predicate sub) sub with
+                                                                      | None -> false
+                                                                      | _ -> true
         match List.tryFind(ruleEval) rules with
             | None -> false
             | _ -> true
