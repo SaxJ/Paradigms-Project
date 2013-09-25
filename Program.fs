@@ -188,12 +188,17 @@ let optionSufficeMapping ((a,b),(c,d)) =
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let rec suffices rules (exp1, exp2) =
-    let evals = [ for (pat, precons) in rules
-                    do yield optionSufficeMapping((exp1,exp2),pat) ]
-    let pred = function thing -> match thing with
-                                    | None -> false
-                                    | Some _ -> true
-    match List.tryFind(pred) evals with
+    let predicate = function x -> suffices rules x
+    let ruleEval R =
+        match R with (suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
+                                    match m with
+                                        | None -> false
+                                        | Some z -> if List.isEmpty lst then true else
+                                                        let sub = subst2 z lst
+                                                        match List.tryFind(predicate) sub with
+                                                            | None -> false
+                                                            | _ -> true
+    match List.tryFind(ruleEval) rules with
         | None -> false
         | _ -> true
 
