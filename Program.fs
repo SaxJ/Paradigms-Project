@@ -187,20 +187,26 @@ let optionSufficeMapping ((a,b),(c,d)) =
                         Some(mapJoin (m,x))
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
-let rec suffices rules (exp1, exp2) =
-    let predicate = function x -> suffices rules x
-    let ruleEval R =
-        match R with (suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
-                                    match m with
-                                        | None -> false
-                                        | Some z -> if List.isEmpty lst then true else
-                                                        let sub = subst2 z lst
-                                                        match List.tryFind(predicate) sub with
-                                                            | None -> false
-                                                            | _ -> true
-    match List.tryFind(ruleEval) rules with
-        | None -> false
-        | _ -> true
+let suffices rules (exp1, exp2) =
+    let rec internSuff rules (exp1,exp2) map =
+        let predicate lst = function x -> let bools = [ for x in lst do if Map.containsKey(x) map then yield true ]
+                                          if List.isEmpty bools then
+                                                internSuff rules x (Map.add(x) () map)
+                                          else
+                                                false
+        let ruleEval R =
+            match R with (suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
+                                        match m with
+                                            | None -> false
+                                            | Some z -> if List.isEmpty lst then true else
+                                                            let sub = subst2 z lst
+                                                            match List.tryFind(predicate sub) sub with
+                                                                | None -> false
+                                                                | _ -> true
+        match List.tryFind(ruleEval) rules with
+            | None -> false
+            | _ -> true
+    internSuff rules (exp1,exp2) Map.empty
 
 
 
