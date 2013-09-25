@@ -192,7 +192,7 @@ let optionSufficeMapping ((a,b),(c,d)) =
     match leftMap with
         | None -> None
         | Some x -> let right = subst1 (x,d)
-                    let rightMap = funify (a, right)
+                    let rightMap = funify (b, right)
                     if rightMap = None then None else
                         let m = Option.get rightMap
                         Some(mapJoin (m,x))
@@ -207,18 +207,14 @@ let sufficeMapping ((a,b), (c,d)) =
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let rec suffices rules (exp1, exp2) =
-    let mapList = [ for Rule(x,y) in rules do
-                        let m = sufficeMapping ((exp1,exp2),x)
-                        if not (Map.isEmpty m) then yield (m,y)]
-    match mapList with 
-        | [] -> false
-        | _ -> List.isEmpty [ for (x,y) in mapList do
-                                 if List.isEmpty y then yield true
-                                 else
-                                    let lst = subst2 x y
-                                    let booleanList = [ for a in lst do
-                                                            if suffices rules a then yield true ]
-                                    if not(List.isEmpty booleanList) then yield true ]
+    let evals = [ for (pat, precons) in rules
+                    do yield optionSufficeMapping((exp1,exp2),pat) ]
+    let pred = function thing -> match thing with
+                                    | None -> false
+                                    | Some _ -> true
+    match List.tryFind(pred) evals with
+        | None -> false
+        | _ -> true
 
 
 
