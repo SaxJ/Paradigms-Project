@@ -124,6 +124,7 @@ let rec expSize = function A|B -> 1
 /////////////////////////////////////////////////
 type Map = exp * (exp ref)
 
+//creates a list of value / key pairs from a exp to a variable exp
 let rec unify (set, vari) =
     let map = Collections.Map.empty
     match set, vari with
@@ -145,7 +146,9 @@ let rec unify (set, vari) =
         | (B,B) -> Some []
         | (_,_) -> None
 
+//performs unification on a exp and vari to return a valid map
 let funify (set, vari) =
+    //loops through a list to create a map without duplicate keys
     let rec loop lst = 
         match lst with
             | [] -> Some Map.empty
@@ -156,11 +159,13 @@ let funify (set, vari) =
                                                 if v <> Map.find !k m then None
                                                 else Some m
                                             else Some( Map.add(!k) v m )
+    //performs the unification and create a map if possible
     match unify(set,vari) with
         | None -> None
         | Some [] -> Some(Map.empty)
         | Some l ->  loop l
 
+//substitutes a map into an exp
 let rec subst1 (map, exp) = 
     match exp with
     | Var x -> if(Map.containsKey(x) map) then
@@ -169,13 +174,16 @@ let rec subst1 (map, exp) =
                     Var x          
     | Mix(x, y) -> Mix( subst1(map, x), subst1(map, y))
     | a -> a  
-    
+
+//substitutes the mapping into a list of sufficencies    
 let subst2 map exps:(sufficency list) =
     [for (x, y) in exps do yield (subst1(map,x), subst1(map,y))]                                                                                             
 
+//joins two maps to one another
 let mapJoin (a,b) =
     Collections.Map(Seq.concat [(Map.toSeq a) ; (Map.toSeq b)])
-         
+
+//generates a mapping between an exp and rule returning an option map        
 let optionSufficeMapping ((a,b),(c,d)) =
     let leftMap = funify (a,c)
     match leftMap with
@@ -189,11 +197,14 @@ let optionSufficeMapping ((a,b),(c,d)) =
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let suffices rules (exp1, exp2) =
     let rec internSuff rules (exp1,exp2) map =
+        //checks whether the generated subsitutions have been seen before
         let predicate lst = function x -> let bools = [ for x in lst do if Map.containsKey(x) map then yield true ]
                                           if List.isEmpty bools then
+                                                //recurses on the substitution
                                                 not( internSuff rules x (Map.add(x) () map) )
                                           else
                                                 true
+        //evaluate whether a given rule can be used to prove sufficiency for exp1 and exp2
         let ruleEval R =
             match R() with Rule(suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
                                               match m with
@@ -203,9 +214,11 @@ let suffices rules (exp1, exp2) =
                                                                   match List.tryFind(predicate sub) sub with
                                                                       | None -> true
                                                                       | _ -> false
+        //attempts to use each rule to suffice for the exp given
         match List.tryFind(ruleEval) rules with
             | None -> false
             | _ -> true
+    //starts recursion on exp and the rules whilst keeping a map of 'seen' pairs
     internSuff rules (exp1,exp2) Map.empty
 
 
