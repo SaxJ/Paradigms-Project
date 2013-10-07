@@ -195,30 +195,28 @@ let optionSufficeMapping ((a,b),(c,d)) =
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let suffices rules (exp1, exp2) =
-    let rec internSuff rules (exp1,exp2) map =
-        //checks whether the generated subsitutions have been seen before
-        let predicate lst = function x -> let bools = [ for x in lst do if Map.containsKey(x) map then yield true ]
-                                          if List.isEmpty bools then
-                                                //recurses on the substitution
-                                                not( internSuff rules x (Map.add(x) () map) )
-                                          else
-                                                true
+    let rec internSuff rules (exp1,exp2) map cons =
+        printfn "Goal: %A, Cons: %A" (exp1,exp2) cons
         //evaluate whether a given rule can be used to prove sufficiency for exp1 and exp2
         let ruleEval R =
             match R() with Rule(suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
                                               match m with
                                                   | None -> false
-                                                  | Some z -> if List.isEmpty lst then true else
-                                                                  let sub = subst2 z lst
-                                                                  match List.tryFind(predicate sub) sub with
-                                                                      | None -> true
-                                                                      | _ -> false
+                                                  | Some z -> let sub = (subst2 z lst) @ cons
+                                                              match sub with
+                                                                    | [] -> true
+                                                                    | _ -> // checking if the mapping has been seen. This is a loop check.
+                                                                                let subResult = subst2 z sub
+                                                                                match subResult with h :: t -> if Map.containsKey(h) map then
+                                                                                                                    false
+                                                                                                               else
+                                                                                                                    internSuff rules h (Map.add(h) () map) t
         //attempts to use each rule to suffice for the exp given
         match List.tryFind(ruleEval) rules with
             | None -> false
             | _ -> true
     //starts recursion on exp and the rules whilst keeping a map of 'seen' pairs
-    internSuff rules (exp1,exp2) Map.empty
+    internSuff rules (exp1,exp2) Map.empty []
 
 
 
