@@ -127,6 +127,7 @@ let rec unify (set, vari) =
     let map = Collections.Map.empty
     match set, vari with
         | x, Var xx ->  Some ((xx, x) :: [])
+        | Var x, xx -> Some ((x,xx) :: [])
         | Mix(a,b),Mix(Var aa, Var bb) -> match (unify (a, Var aa), unify (b, Var bb)) with
                                           | None, _ | _, None -> None
                                           | (Some a, Some b) -> Some(a @ b)
