@@ -196,7 +196,6 @@ let optionSufficeMapping ((a,b),(c,d)) =
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let suffices rules (exp1, exp2) =
     let rec internSuff rules (exp1,exp2) map cons =
-        printfn "Goal: %A, Cons: %A" (exp1,exp2) cons
         //evaluate whether a given rule can be used to prove sufficiency for exp1 and exp2
         let ruleEval R =
             match R() with Rule(suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
