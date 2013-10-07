@@ -128,16 +128,16 @@ type Map = exp * (exp ref)
 let rec unify (set, vari) =
     let map = Collections.Map.empty
     match set, vari with
-        | x, Var xx ->  Some ((x, ref xx) :: [])
+        | x, Var xx ->  Some ((x, xx) :: [])
         | Mix(a,b),Mix(Var aa, Var bb) -> match (unify (a, Var aa), unify (b, Var bb)) with
                                           | None, _ | _, None -> None
                                           | (Some a, Some b) -> Some(a @ b)
         | Mix(a,b),Mix(Var aa, bb) | Mix(b,a),Mix(bb, Var aa) -> match (b,bb) with
                                                                     | (Mix(_,_),Mix(_, _)) -> match unify(b, bb) with
                                                                                               | None ->  None
-                                                                                              | Some n -> Some( (a, ref aa) :: n )
-                                                                    | (A,A) -> Some( (a, ref aa) :: [] )
-                                                                    | (B,B) -> Some( (a, ref aa) :: [] )
+                                                                                              | Some n -> Some( (a, aa) :: n )
+                                                                    | (A,A) -> Some( (a, aa) :: [] )
+                                                                    | (B,B) -> Some( (a, aa) :: [] )
                                                                     | (_,_) -> Some []
         | Mix(a,b),Mix(aa,bb) -> match (unify (a, aa), unify (b, bb)) with
                                  | None, _ | _, None -> None
@@ -155,10 +155,10 @@ let funify (set, vari) =
             | (v, k) :: t -> let tail = loop t
                              match tail with
                                 | None -> None
-                                | Some m -> if Map.containsKey !k m then
-                                                if v <> Map.find !k m then None
+                                | Some m -> if Map.containsKey k m then
+                                                if v <> Map.find k m then None
                                                 else Some m
-                                            else Some( Map.add(!k) v m )
+                                            else Some( Map.add(k) v m )
     //performs the unification and create a map if possible
     match unify(set,vari) with
         | None -> None
