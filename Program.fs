@@ -122,22 +122,20 @@ let rec expSize = function A|B -> 1
 /////////////////////////////////////////////////                        
 /////  Put your code for the first part here                         
 /////////////////////////////////////////////////
-type Map = exp * (exp ref)
-
 //creates a list of value / key pairs from a exp to a variable exp
 let rec unify (set, vari) =
     let map = Collections.Map.empty
     match set, vari with
-        | x, Var xx ->  Some ((x, xx) :: [])
+        | x, Var xx ->  Some ((xx, x) :: [])
         | Mix(a,b),Mix(Var aa, Var bb) -> match (unify (a, Var aa), unify (b, Var bb)) with
                                           | None, _ | _, None -> None
                                           | (Some a, Some b) -> Some(a @ b)
         | Mix(a,b),Mix(Var aa, bb) | Mix(b,a),Mix(bb, Var aa) -> match (b,bb) with
                                                                     | (Mix(_,_),Mix(_, _)) -> match unify(b, bb) with
                                                                                               | None ->  None
-                                                                                              | Some n -> Some( (a, aa) :: n )
-                                                                    | (A,A) -> Some( (a, aa) :: [] )
-                                                                    | (B,B) -> Some( (a, aa) :: [] )
+                                                                                              | Some n -> Some( (aa, a) :: n )
+                                                                    | (A,A) -> Some( (aa, a) :: [] )
+                                                                    | (B,B) -> Some( (aa, a) :: [] )
                                                                     | (_,_) -> Some []
         | Mix(a,b),Mix(aa,bb) -> match (unify (a, aa), unify (b, bb)) with
                                  | None, _ | _, None -> None
@@ -152,7 +150,7 @@ let funify (set, vari) =
     let rec loop lst = 
         match lst with
             | [] -> Some Map.empty
-            | (v, k) :: t -> let tail = loop t
+            | (k, v) :: t -> let tail = loop t
                              match tail with
                                 | None -> None
                                 | Some m -> if Map.containsKey k m then
