@@ -262,8 +262,7 @@ let suffices rules (exp1, exp2) =
 // 12. A smaller experiment with the same number of clients should be preferred over a larger one.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-                         
+         
 
 // These are some handy functions for creating rule generators with different numbers of variables
 
@@ -509,4 +508,3 @@ do let clients, _ = mkClientsAndLabs 5 [rulesA; rulesB]
 
 randomTest 10 50 4 8 [rulesB; rulesB] |> ignore            // A smaller random test.
 randomTest 5 20 5 20 [rulesA; rulesB; rulesC] |> ignore    // A larger random test.
-
