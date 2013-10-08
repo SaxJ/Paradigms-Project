@@ -124,7 +124,6 @@ let rec expSize = function A|B -> 1
 /////////////////////////////////////////////////
 //creates a list of value / key pairs from a exp to a variable exp
 let rec unify (set, vari) =
-    let map = Collections.Map.empty
     match set, vari with
         | x, Var xx ->  Some ((xx, x) :: [])
         | Var x, xx -> Some ((x,xx) :: [])
@@ -205,9 +204,6 @@ let suffices rules (exp1, exp2) =
             | _ -> true
     //starts recursion on exp and the rules whilst keeping a map of 'seen' pairs
     internSuff rules (exp1,exp2) Map.empty []
-
-
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Hints:  First, see the hints on the project handout. Then the following are hints to help get you started. 
