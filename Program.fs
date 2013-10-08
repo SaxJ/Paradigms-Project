@@ -128,16 +128,6 @@ let rec unify (set, vari) =
     match set, vari with
         | x, Var xx ->  Some ((xx, x) :: [])
         | Var x, xx -> Some ((x,xx) :: [])
-        | Mix(a,b),Mix(Var aa, Var bb) -> match (unify (a, Var aa), unify (b, Var bb)) with
-                                          | None, _ | _, None -> None
-                                          | (Some a, Some b) -> Some(a @ b)
-        | Mix(a,b),Mix(Var aa, bb) | Mix(b,a),Mix(bb, Var aa) -> match (b,bb) with
-                                                                    | (Mix(_,_),Mix(_, _)) -> match unify(b, bb) with
-                                                                                              | None ->  None
-                                                                                              | Some n -> Some( (aa, a) :: n )
-                                                                    | (A,A) -> Some( (aa, a) :: [] )
-                                                                    | (B,B) -> Some( (aa, a) :: [] )
-                                                                    | (_,_) -> Some []
         | Mix(a,b),Mix(aa,bb) -> match (unify (a, aa), unify (b, bb)) with
                                  | None, _ | _, None -> None
                                  | (Some a, Some b) -> Some(a @ b)
@@ -161,7 +151,6 @@ let funify (set, vari) =
     //performs the unification and create a map if possible
     match unify(set,vari) with
         | None -> None
-        | Some [] -> Some(Map.empty)
         | Some l ->  loop l
 
 //substitutes a map into an exp
@@ -201,7 +190,7 @@ let suffices rules (exp1, exp2) =
             match R() with Rule(suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
                                               match m with
                                                   | None -> false
-                                                  | Some z -> let sub = (subst2 z lst) @ cons
+                                                  | Some z -> let sub = lst @ cons
                                                               match sub with
                                                                     | [] -> true
                                                                     | _ -> // checking if the mapping has been seen. This is a loop check.
