@@ -130,9 +130,8 @@ let rec unify (set, vari) =
         | Mix(a,b),Mix(aa,bb) -> match (unify (a, aa), unify (b, bb)) with
                                  | None, _ | _, None -> None
                                  | (Some a, Some b) -> Some(a @ b)
-        | (A,A) -> Some []
-        | (B,B) -> Some []
-        | (_,_) -> None
+        | x, y -> if x <> y then None
+                  else Some []
 
 //performs unification on a exp and vari to return a valid map
 let funify (set, vari) =
@@ -140,8 +139,7 @@ let funify (set, vari) =
     let rec loop lst = 
         match lst with
             | [] -> Some Map.empty
-            | (k, v) :: t -> let tail = loop t
-                             match tail with
+            | (k, v) :: t -> match loop t with
                                 | None -> None
                                 | Some m -> if Map.containsKey k m then
                                                 if v <> Map.find k m then None
@@ -186,17 +184,14 @@ let suffices rules (exp1, exp2) =
     let rec internSuff rules (exp1,exp2) map cons =
         //evaluate whether a given rule can be used to prove sufficiency for exp1 and exp2
         let ruleEval R =
-            match R() with Rule(suff, lst) -> let m = optionSufficeMapping((exp1,exp2),suff)
-                                              match m with
+            match R() with Rule(suff, lst) -> match optionSufficeMapping((exp1,exp2),suff) with
                                                   | None -> false
-                                                  | Some z -> let sub = lst @ cons
-                                                              match sub with
+                                                  | Some z -> match lst @ cons with
                                                                     | [] -> true
-                                                                    | _ -> // checking if the mapping has been seen. This is a loop check.
-                                                                                let subResult = subst2 z sub
-                                                                                match subResult with h :: t -> if Map.containsKey(h) map then
+                                                                    | c -> // checking if the mapping has been seen. This is a loop check.
+                                                                           match (subst2 z c) with h :: t -> if Map.containsKey(h) map then
                                                                                                                     false
-                                                                                                               else
+                                                                                                             else
                                                                                                                     internSuff rules h (Map.add(h) () map) t
         //attempts to use each rule to suffice for the exp given
         match List.tryFind(ruleEval) rules with
