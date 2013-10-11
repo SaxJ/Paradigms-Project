@@ -178,10 +178,12 @@ let optionSufficeMapping ((a,b),(c,d)) =
                     if rightMap = None then None else
                         let m = Option.get rightMap
                         Some(mapJoin (m,x))
+//depth limit
+let depthLimit = 50;
 
 // Suffices checks whether exp1 suffices instead of exp2 according to rules.
 let suffices rules (exp1, exp2) =
-    let rec internSuff rules (exp1,exp2) map cons =
+    let rec internSuff rules (exp1,exp2) d cons =
         //evaluate whether a given rule can be used to prove sufficiency for exp1 and exp2
         let ruleEval R =
             match R() with Rule(suff, lst) -> match optionSufficeMapping((exp1,exp2),suff) with
@@ -189,16 +191,16 @@ let suffices rules (exp1, exp2) =
                                                   | Some z -> match lst @ cons with
                                                                     | [] -> true
                                                                     | c -> // checking if the mapping has been seen. This is a loop check.
-                                                                           match (subst2 z c) with h :: t -> if Map.containsKey(h) map then
+                                                                           match (subst2 z c) with h :: t -> if d > depthLimit then
                                                                                                                     false
                                                                                                              else
-                                                                                                                    internSuff rules h (Map.add(h) () map) t
+                                                                                                                    internSuff rules h (d+1) t
         //attempts to use each rule to suffice for the exp given
         match List.tryFind(ruleEval) rules with
             | None -> false
             | _ -> true
     //starts recursion on exp and the rules whilst keeping a map of 'seen' pairs
-    internSuff rules (exp1,exp2) Map.empty []
+    internSuff rules (exp1,exp2) 0 []
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Hints:  First, see the hints on the project handout. Then the following are hints to help get you started. 
