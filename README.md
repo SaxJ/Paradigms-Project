@@ -35,6 +35,19 @@ other.cancelMyRequest lab me
 	else
 		pass message on to who they think owns it
 
+other.doIsuffice myexp rules
+	suffices rules myexp otherexp 
+
+other.askForOwner labId
+	returns who it thinks is owner for labID
+
+me.askOthersForOwner labID
+	asks who he thinks owns lab - adds to a queue
+		add response to table
+	loops back and does same on response - until asked client matches response from client
+	inform clients in the queue
+		
+
 me.releaseLab
 	is there somebody in line?
 		if yes: first.acceptOwnership lab remainingQueue
