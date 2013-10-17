@@ -411,6 +411,9 @@ type client (clientID, numLabs) =
 
     member this.ClientID = clientID  // So other clients can find our ID easily
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs
+    
+    //let others know of who we think is the owner of a lab
+    member this.ownerOf labID = lastKnownCoord.[labID];
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =    // You need to write this member.
