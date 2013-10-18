@@ -413,7 +413,27 @@ type client (clientID, numLabs) =
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs
     
     //let others know of who we think is the owner of a lab
-    member this.ownerOf labID = lastKnownCoord.[labID];
+    member this.ownerOf labID = lastKnownCoord.[labID]
+    
+    //update our mapping
+    member this.updateTable labID clientID = lastKnownCoord.[labID] = clientID
+    
+    //performs an 'ownership lookup' and calls a function
+    member this.doOnOwnerOf labID f =
+        //a recursive function to find the true owner while building a list is 'forwarders'
+        let rec ask client = match (!clients).[client].ownerOf labID with
+                             | c -> if c = client then 
+                                        []
+                                    else 
+                                        ignore(this.updateTable labID c) 
+                                        c :: ask c
+        //initiat asking of the clients
+        let forwarders = ask lastKnownCoord.[labID]
+        //inform others
+        ignore(List.map (this.updateTable labID) forwarders)
+        //perform action
+        f lastKnownCoord.[labID] 
+                             
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =    // You need to write this member.
