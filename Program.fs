@@ -412,7 +412,7 @@ type client (clientID, numLabs) =
     member this.ClientID = clientID  // So other clients can find our ID easily
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs
     
-    //let others know of who we think is the owner of a lab
+    //let others know of who we think is the owner of a lab is
     member this.ownerOf labID = lastKnownCoord.[labID]
     
     //update our mapping
@@ -423,16 +423,19 @@ type client (clientID, numLabs) =
         //a recursive function to find the true owner while building a list is 'forwarders'
         let rec ask client = match (!clients).[client].ownerOf labID with
                              | c -> if c = client then 
+                                        ignore(this.updateTable labID c) 
                                         []
                                     else 
-                                        ignore(this.updateTable labID c) 
                                         c :: ask c
-        //initiat asking of the clients
+        //initiate lookup and store list of forwarding partys
         let forwarders = ask lastKnownCoord.[labID]
+        //locally store the final correct owner
+        let correctOwner = lastKnownCoord.[labID]
         //inform others
-        ignore(List.map (this.updateTable labID) forwarders)
+        for cl in forwarders do
+            ignore((!clients).[cl].updateTable labID correctOwner)
         //perform action
-        f lastKnownCoord.[labID] 
+        f correctOwner 
                              
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
