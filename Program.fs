@@ -408,12 +408,18 @@ type client (clientID, numLabs) =
     // printing functions for this client
     let prStr (pre:string) str = prIndStr clientID (sprintf "Client%d: %s" clientID pre) str 
     let pr (pre:string) res = prStr pre (sprintf "%A" res); res
+    
+    //holds the list of people waiting to use my lab
+    let queue = ref []
 
     member this.ClientID = clientID  // So other clients can find our ID easily
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs
     
     //let others know of who we think is the owner of a lab is
-    member this.ownerOf labID = lastKnownCoord.[labID]
+    member this.askForOwner labID = lastKnownCoord.[labID]
+    
+    //allows clients to request that they be added to the queue
+    member this.addToQueue =
     
     //update our mapping
     member this.updateTable labID clientID = lastKnownCoord.[labID] = clientID
@@ -421,7 +427,7 @@ type client (clientID, numLabs) =
     //performs an 'ownership lookup' and calls a function
     member this.doOnOwnerOf labID f =
         //a recursive function to find the true owner while building a list is 'forwarders'
-        let rec ask client = match (!clients).[client].ownerOf labID with
+        let rec ask client = match (!clients).[client].askForOwner labID with
                              | c -> if c = client then 
                                         ignore(this.updateTable labID c) 
                                         []
