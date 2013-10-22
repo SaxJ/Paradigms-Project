@@ -449,8 +449,8 @@ type client (clientID, numLabs) =
     member this.DoExp delay exp =    // You need to write this member.
         //  The following code doesn't coordinate the clients at all.  Replace it with code that does.
         let result = ref None
-        (!labs).[0].DoExp delay exp clientID (fun res -> result:=Some res)
-        (!result).Value
+        async { (!labs).[0].DoExp delay exp clientID (fun res -> result:=Some res)
+                return (!result).Value }
 
     // Add any additional members for client here - you will at least need some that can be called from
     // other instances of the client class in order to coordinate requests.
