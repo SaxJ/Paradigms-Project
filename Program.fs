@@ -417,16 +417,21 @@ type client (clientID, numLabs) =
     
     //let others know of who we think is the owner of a lab is
     member this.askForOwner labID = lastKnownCoord.[labID]
-    
+        
     //allows clients to request that they be added to the queue
-    member this.addToQueue clientID = //add check to see if i'm done - if i am, hand it over
+    member this.addToQueue labID clientID = //add check to see if i'm done - if i am, hand it over
                                       queue:= (!queue)@[clientID]
+                                      
+    //allows clients to cancel their requests
+    member this.cancelMyRequest labID clientID = //check if i own the lab (i should)
+                                                 //remove client from the queue
+                                                 
     
     //update our mapping
-    member this.updateTable labID clientID = lastKnownCoord.[labID] = clientID
+    member this.updateHolder labID clientID = lastKnownCoord.[labID] = clientID
     
     //performs an 'ownership lookup' and returns the owner's ID
-    member this.doLookup labID =
+    member private this.askOthersForOwner labID =
         //a recursive function to find the true owner while building a list is 'forwarders'
         let rec ask client = match (!clients).[client].askForOwner labID with
                              | c -> if c = client then 
@@ -443,6 +448,20 @@ type client (clientID, numLabs) =
             ignore( (!clients).[cl].updateTable labID correctOwner )
         //return owner
         correctOwner 
+        
+    member this.acceptOwnership lab queue = 
+        //other.isFinished = false;
+        //adds itself as holder of lab
+        //informs the others in queue that it is now the holder
+        //cancel requests for other labs (by using lab holders that it knows)
+        //do the experiment
+        
+    member private releaseLab = 
+        //is there somebody in line?
+            //if yes: first.acceptOwnership lab remainingQueue
+                    //me.updateHolder lab first
+        //else
+            //set a flag to remember I'm done
                              
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
