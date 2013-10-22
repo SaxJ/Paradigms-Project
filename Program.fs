@@ -452,7 +452,7 @@ type client (clientID, numLabs) =
         //return owner
         correctOwner 
         
-    member this.acceptOwnership lab queue =
+    member this.acceptOwnership lab queue = None
         
         //other.isFinished = false;
         //adds itself as holder of lab
@@ -460,10 +460,10 @@ type client (clientID, numLabs) =
         //cancel requests for other labs (by using lab holders that it knows)
         //do the experiment
         
-    member private releaseLab labID = match (!queue) with
-                                      | h :: t -> (!clients).[h].acceptOwnership labID t
-                                                  this.updateHolder labID h
-                                      | [] -> ()
+    member private this.releaseLab labID = match (!queue) with
+                                           | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
+                                                       ignore(this.updateHolder labID h)
+                                           | [] -> ()
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =    // You need to write this member.
