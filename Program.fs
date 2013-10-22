@@ -423,9 +423,8 @@ type client (clientID, numLabs) =
                                       queue:= (!queue)@[clientID]
                                       
     //allows clients to cancel their requests
-    member this.cancelMyRequest labID clientID = //check if i own the lab (i should)
-                                                 //remove client from the queue
-                                                 
+    member this.cancelMyRequest labID clientID = if lastKnownCoord.[labID] = this.ClientID then do    
+                                                    queue := [ for cl in !queue do if not(cl = clientID) then yield cl ]                                             
     
     //update our mapping
     member this.updateHolder labID clientID = lastKnownCoord.[labID] = clientID
@@ -435,7 +434,7 @@ type client (clientID, numLabs) =
         //a recursive function to find the true owner while building a list is 'forwarders'
         let rec ask client = match (!clients).[client].askForOwner labID with
                              | c -> if c = client then 
-                                        ignore( this.updateTable labID c )
+                                        ignore( this.updateHolder labID c )
                                         []
                                     else 
                                         c :: ask c
@@ -445,11 +444,12 @@ type client (clientID, numLabs) =
         let correctOwner = lastKnownCoord.[labID]
         //inform others
         for cl in forwarders do
-            ignore( (!clients).[cl].updateTable labID correctOwner )
+            ignore( (!clients).[cl].updateHolder labID correctOwner )
         //return owner
         correctOwner 
         
-    member this.acceptOwnership lab queue = 
+    member this.acceptOwnership lab queue =
+        
         //other.isFinished = false;
         //adds itself as holder of lab
         //informs the others in queue that it is now the holder
