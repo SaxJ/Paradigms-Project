@@ -419,17 +419,18 @@ type client (clientID, numLabs) =
     member this.askForOwner labID = lastKnownCoord.[labID]
     
     //allows clients to request that they be added to the queue
-    member this.addToQueue =
+    member this.addToQueue clientID = //add check to see if i'm done - if i am, hand it over
+                                      queue:= (!queue)@[clientID]
     
     //update our mapping
     member this.updateTable labID clientID = lastKnownCoord.[labID] = clientID
     
-    //performs an 'ownership lookup' and calls a function
-    member this.doOnOwnerOf labID f =
+    //performs an 'ownership lookup' and returns the owner's ID
+    member this.doLookup labID =
         //a recursive function to find the true owner while building a list is 'forwarders'
         let rec ask client = match (!clients).[client].askForOwner labID with
                              | c -> if c = client then 
-                                        ignore(this.updateTable labID c) 
+                                        ignore( this.updateTable labID c )
                                         []
                                     else 
                                         c :: ask c
@@ -439,9 +440,9 @@ type client (clientID, numLabs) =
         let correctOwner = lastKnownCoord.[labID]
         //inform others
         for cl in forwarders do
-            ignore((!clients).[cl].updateTable labID correctOwner)
-        //perform action
-        f correctOwner 
+            ignore( (!clients).[cl].updateTable labID correctOwner )
+        //return owner
+        correctOwner 
                              
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
@@ -449,7 +450,6 @@ type client (clientID, numLabs) =
         //  The following code doesn't coordinate the clients at all.  Replace it with code that does.
         let result = ref None
         (!labs).[0].DoExp delay exp clientID (fun res -> result:=Some res)
-        while (!result).IsNone do ()  // This is busy waiting, which isn't allowed - you'll need to fix it.
         (!result).Value
 
     // Add any additional members for client here - you will at least need some that can be called from
