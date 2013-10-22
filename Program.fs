@@ -463,7 +463,7 @@ type client (clientID, numLabs) =
     member private releaseLab labID = match (!queue) with
                                       | h :: t -> (!clients).[h].acceptOwnership labID t
                                                   this.updateHolder labID h
-                                      | [] -> expr := None
+                                      | [] -> ()
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =    // You need to write this member.
@@ -471,6 +471,7 @@ type client (clientID, numLabs) =
         let result = ref None
         expr:= Some exp
         async { (!labs).[0].DoExp delay exp clientID (fun res -> result:=Some res)
+                expr := None
                 return (!result).Value }
 
     // Add any additional members for client here - you will at least need some that can be called from
