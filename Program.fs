@@ -411,6 +411,9 @@ type client (clientID, numLabs) =
     
     //holds the list of people waiting to use my lab
     let queue = ref []
+    
+    //holds the experiment to be completed
+    let expr = ref None
 
     member this.ClientID = clientID  // So other clients can find our ID easily
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs
@@ -419,8 +422,8 @@ type client (clientID, numLabs) =
     member this.askForOwner labID = lastKnownCoord.[labID]
         
     //allows clients to request that they be added to the queue
-    member this.addToQueue labID clientID = //add check to see if i'm done - if i am, hand it over
-                                      queue:= (!queue)@[clientID]
+    member this.addToQueue labID clientID = queue:= (!queue)@[clientID]
+                                            if (!expr) = None then this.releaseLab
                                       
     //allows clients to cancel their requests
     member this.cancelMyRequest labID clientID = //check if i own the lab (i should)
@@ -456,7 +459,8 @@ type client (clientID, numLabs) =
         //cancel requests for other labs (by using lab holders that it knows)
         //do the experiment
         
-    member private releaseLab = 
+    member private releaseLab = match (!queue) with
+                                | 
         //is there somebody in line?
             //if yes: first.acceptOwnership lab remainingQueue
                     //me.updateHolder lab first
@@ -468,6 +472,7 @@ type client (clientID, numLabs) =
     member this.DoExp delay exp =    // You need to write this member.
         //  The following code doesn't coordinate the clients at all.  Replace it with code that does.
         let result = ref None
+        expr:= Some exp
         async { (!labs).[0].DoExp delay exp clientID (fun res -> result:=Some res)
                 return (!result).Value }
 
