@@ -422,8 +422,9 @@ type client (clientID, numLabs) =
     member this.askForOwner labID = lastKnownCoord.[labID]
         
     //allows clients to request that they be added to the queue
-    member this.addToQueue labID clientID = queue:= (!queue)@[clientID]
-                                            if (!expr) = None then this.releaseLab
+    member this.addToQueue labID clientID = if lastKnownCoord.[labID] = this.ClientID then do
+                                                queue:= (!queue)@[clientID]
+                                                if (!expr) = None then this.releaseLab labID
                                       
     //allows clients to cancel their requests
     member this.cancelMyRequest labID clientID = if lastKnownCoord.[labID] = this.ClientID then do    
@@ -459,14 +460,10 @@ type client (clientID, numLabs) =
         //cancel requests for other labs (by using lab holders that it knows)
         //do the experiment
         
-    member private releaseLab = match (!queue) with
-                                | 
-        //is there somebody in line?
-            //if yes: first.acceptOwnership lab remainingQueue
-                    //me.updateHolder lab first
-        //else
-            //set a flag to remember I'm done
-                             
+    member private releaseLab labID = match (!queue) with
+                                      | h :: t -> (!clients).[h].acceptOwnership labID t
+                                                  this.updateHolder labID h
+                                      | [] -> expr := None
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =    // You need to write this member.
