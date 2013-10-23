@@ -451,8 +451,13 @@ type client (clientID, numLabs) =
             ignore( (!clients).[cl].updateHolder labID correctOwner )
         //return owner
         correctOwner 
+<<<<<<< HEAD
         
     (*member this.acceptOwnership lab queue =
+=======
+        
+    member this.acceptOwnership lab queue =
+>>>>>>> bec267277d99daf23072c6c482d7beb330513f98
         if not(Option.isNone expr) then do
             lastKnownCoord.[lab] = clientID
             this.queue := queue
@@ -468,10 +473,17 @@ type client (clientID, numLabs) =
         //cancel requests for other labs (by using lab holders that it knows)
         //do the experiment*)
         
+<<<<<<< HEAD
     (*member private this.releaseLab labID = match (!queue) with
                                       | h :: t -> (!clients).[h].acceptOwnership labID t
                                                   this.updateHolder labID h
                                       | [] -> ()*)
+=======
+    member private this.releaseLab labID = match (!queue) with
+                                           | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
+                                                       ignore(this.updateHolder labID h)
+                                           | [] -> ()
+>>>>>>> bec267277d99daf23072c6c482d7beb330513f98
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =    // You need to write this member.
