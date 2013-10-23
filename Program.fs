@@ -413,7 +413,8 @@ type client (clientID, numLabs) =
     let queue = ref []
     
     ///holds the experiment function to be run when I get the lab
-    let expr = ref None
+    let (expr:(int -> unit) ref) = ref (fun _ -> ())
+    let (haveExpr:bool ref) = ref false
 
     member this.ClientID = clientID  // So other clients can find our ID easily
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs
@@ -424,7 +425,7 @@ type client (clientID, numLabs) =
     ///allows clients to request that they be added to the queue
     member this.addToQueue labID clientID = if lastKnownCoord.[labID] = this.ClientID then do
                                                 queue:= (!queue)@[clientID]
-                                                if (!expr) = None then this.releaseLab labID
+                                                if not(!haveExpr) then this.releaseLab labID
                                       
     ///allows clients to cancel their requests
     member this.cancelMyRequest labID (clientID:int) = if lastKnownCoord.[labID] = this.ClientID then do    
@@ -451,10 +452,16 @@ type client (clientID, numLabs) =
             ignore( (!clients).[cl].updateHolder labID correctOwner )
         //return owner
         correctOwner 
+    
+    ///function to add yourself to all the lab queues
+    member private this.addMeToQueues () =
+        for n in 0 .. Array.length(lastKnownCoord) do
+            let ownerId = this.askOthersForOwner n
+            (!clients).[ownerId].addToQueue n this.ClientID
  
     /// called when you're being told to take a lab damn it
     member this.acceptOwnership lab que =
-        if not(Option.isNone !expr) then do
+        if !haveExpr then do
             lastKnownCoord.[lab] <- clientID
             queue := que
             for x in que do ignore((!clients).[x].updateHolder lab clientID)
@@ -478,14 +485,24 @@ type client (clientID, numLabs) =
         // the function to execute when I get the lab will alert me that my lock is released, and it will set the value in the
         // original DoExp scope, which I then return.
         // hey pronto, you're done damnit.
+
         let result = ref None
-        expr:= None        
-        let a = async { (!labs).[0].DoExp delay exp clientID (fun res -> printfn "Cont"; result:=Some res)
-                        expr := None
-                        printfn "Finished!"
-                        return (!result).Value }
-        let r = Async.RunSynchronously a
-        r
+        // the function called when this client becomes lab master. Executes the lab DoExp, with a continuation that assigns the result and wakes
+        // waiters when the lab is done.
+        let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> result := Some res; wakeWaiters this))
+
+        //function to execute while we have lock
+        let haveLock () =
+            haveExpr := true
+            expr := doOnOwner
+            this.addMeToQueues()
+
+        // lock this client
+        lock this haveLock
+        // wait for the lock to be released
+        waitFor this
+        result
+
 
     // Add any additional members for client here - you will at least need some that can be called from
     // other instances of the client class in order to coordinate requests.
