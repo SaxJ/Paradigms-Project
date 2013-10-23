@@ -471,10 +471,15 @@ type client (clientID, numLabs) =
                                            | [] -> ()
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
-    member this.DoExp delay exp =    // You need to write this member.
-        //  The following code doesn't coordinate the clients at all.  Replace it with code that does.
+    member this.DoExp delay exp =
+        //lock this client
+        //add me to queue, and store the closure of the function I want to execute when I get the lab
+        //wait until my lock is released.
+        // the function to execute when I get the lab will alert me that my lock is released, and it will set the value in the
+        // original DoExp scope, which I then return.
+        // hey pronto, you're done damnit.
         let result = ref None
-        expr:= Some exp
+        expr:= None        
         let a = async { (!labs).[0].DoExp delay exp clientID (fun res -> printfn "Cont"; result:=Some res)
                         expr := None
                         printfn "Finished!"
