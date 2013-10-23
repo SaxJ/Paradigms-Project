@@ -422,9 +422,9 @@ type client (clientID, numLabs) =
     member this.askForOwner labID = lastKnownCoord.[labID]
         
     //allows clients to request that they be added to the queue
-    member this.addToQueue labID clientID = if lastKnownCoord.[labID] = this.ClientID then do
+    (*member this.addToQueue labID clientID = if lastKnownCoord.[labID] = this.ClientID then do
                                                 queue:= (!queue)@[clientID]
-                                                if (!expr) = None then this.releaseLab labID
+                                                if (!expr) = None then this.releaseLab labID*)
                                       
     //allows clients to cancel their requests
     member this.cancelMyRequest labID clientID = if lastKnownCoord.[labID] = this.ClientID then do    
@@ -452,7 +452,7 @@ type client (clientID, numLabs) =
         //return owner
         correctOwner 
         
-    member this.acceptOwnership lab queue =
+    (*member this.acceptOwnership lab queue =
         if not(Option.isNone expr) then do
             lastKnownCoord.[lab] = clientID
             this.queue := queue
@@ -466,21 +466,24 @@ type client (clientID, numLabs) =
         //adds itself as holder of lab
         //informs the others in queue that it is now the holder
         //cancel requests for other labs (by using lab holders that it knows)
-        //do the experiment
+        //do the experiment*)
         
-    member private releaseLab labID = match (!queue) with
+    (*member private this.releaseLab labID = match (!queue) with
                                       | h :: t -> (!clients).[h].acceptOwnership labID t
                                                   this.updateHolder labID h
-                                      | [] -> ()
+                                      | [] -> ()*)
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =    // You need to write this member.
         //  The following code doesn't coordinate the clients at all.  Replace it with code that does.
         let result = ref None
         expr:= Some exp
-        async { (!labs).[0].DoExp delay exp clientID (fun res -> result:=Some res)
-                expr := None
-                return (!result).Value }
+        let a = async { (!labs).[0].DoExp delay exp clientID (fun res -> printfn "Cont"; result:=Some res)
+                        expr := None
+                        printfn "Finished!"
+                        return (!result).Value }
+        let r = Async.RunSynchronously a
+        r
 
     // Add any additional members for client here - you will at least need some that can be called from
     // other instances of the client class in order to coordinate requests.
