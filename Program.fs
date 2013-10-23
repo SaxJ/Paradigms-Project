@@ -409,31 +409,31 @@ type client (clientID, numLabs) =
     let prStr (pre:string) str = prIndStr clientID (sprintf "Client%d: %s" clientID pre) str 
     let pr (pre:string) res = prStr pre (sprintf "%A" res); res
     
-    //holds the list of people waiting to use my lab
+    ///holds the list of people waiting to use my lab
     let queue = ref []
     
-    //holds the experiment to be completed
+    ///holds the experiment function to be run when I get the lab
     let expr = ref None
 
     member this.ClientID = clientID  // So other clients can find our ID easily
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs
     
-    //let others know of who we think is the owner of a lab is
+    ///let others know of who we think is the owner of a lab is
     member this.askForOwner labID = lastKnownCoord.[labID]
         
-    //allows clients to request that they be added to the queue
-    (*member this.addToQueue labID clientID = if lastKnownCoord.[labID] = this.ClientID then do
+    ///allows clients to request that they be added to the queue
+    member this.addToQueue labID clientID = if lastKnownCoord.[labID] = this.ClientID then do
                                                 queue:= (!queue)@[clientID]
-                                                if (!expr) = None then this.releaseLab labID*)
+                                                if (!expr) = None then this.releaseLab labID
                                       
-    //allows clients to cancel their requests
-    member this.cancelMyRequest labID clientID = if lastKnownCoord.[labID] = this.ClientID then do    
-                                                    queue := [ for cl in !queue do if not(cl = clientID) then yield cl ]                                             
+    ///allows clients to cancel their requests
+    member this.cancelMyRequest labID (clientID:int) = if lastKnownCoord.[labID] = this.ClientID then do    
+                                                        queue := [ for cl in !queue do if not(cl = clientID) then yield cl ]                                             
     
-    //update our mapping
+    ///update our mapping
     member this.updateHolder labID clientID = lastKnownCoord.[labID] = clientID
     
-    //performs an 'ownership lookup' and returns the owner's ID
+    ///performs an 'ownership lookup' and returns the owner's ID
     member private this.askOthersForOwner labID =
         //a recursive function to find the true owner while building a list is 'forwarders'
         let rec ask client = match (!clients).[client].askForOwner labID with
@@ -452,22 +452,19 @@ type client (clientID, numLabs) =
         //return owner
         correctOwner 
  
-    member this.acceptOwnership lab queue =
-        if not(Option.isNone expr) then do
-            lastKnownCoord.[lab] = clientID
-            this.queue := queue
-            for x in !queue do x.updateHolder lab clientID
+    /// called when you're being told to take a lab damn it
+    member this.acceptOwnership lab que =
+        if not(Option.isNone !expr) then do
+            lastKnownCoord.[lab] <- clientID
+            queue := que
+            for x in que do ignore((!clients).[x].updateHolder lab clientID)
             for n in 0 .. Array.length(lastKnownCoord) do
                 let id = lastKnownCoord.[n]
                 let cli = (!clients).[id]
                 cli.cancelMyRequest n clientID
-            (!labs).[lab].DoExp
-        //other.isFinished = false;
-        //adds itself as holder of lab
-        //informs the others in queue that it is now the holder
-        //cancel requests for other labs (by using lab holders that it knows)
-        //do the experiment*)
-        
+            (!labs).[lab].DoExp 50 A 1 (fun b -> ())
+    
+    ///releases a lab    
     member private this.releaseLab labID = match (!queue) with
                                            | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
                                                        ignore(this.updateHolder labID h)
