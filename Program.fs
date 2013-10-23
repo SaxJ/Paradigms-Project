@@ -452,8 +452,16 @@ type client (clientID, numLabs) =
         //return owner
         correctOwner 
         
-    member this.acceptOwnership lab queue = None
-        
+    member this.acceptOwnership lab queue =
+        if not(Option.isNone expr) then do
+            lastKnownCoord.[lab] = clientID
+            this.queue := queue
+            for x in !queue do x.updateHolder lab clientID
+            for n in 0 .. Array.length(lastKnownCoord) do
+                let id = lastKnownCoord.[n]
+                let cli = (!clients).[id]
+                cli.cancelMyRequest n clientID
+            (!labs).[lab].DoExp
         //other.isFinished = false;
         //adds itself as holder of lab
         //informs the others in queue that it is now the holder
