@@ -459,7 +459,7 @@ type client (clientID, numLabs) =
             let ownerId = this.askOthersForOwner n
             (!clients).[ownerId].addToQueue n this.ClientID
  
-    /// called when you're being told to take a lab damn it
+    /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
         if !haveExpr then do
             lastKnownCoord.[lab] <- clientID
@@ -489,7 +489,7 @@ type client (clientID, numLabs) =
         let result = ref None
         // the function called when this client becomes lab master. Executes the lab DoExp, with a continuation that assigns the result and wakes
         // waiters when the lab is done.
-        let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> result := Some res; wakeWaiters this))
+        let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> result := Some res; haveExpr := false; wakeWaiters this))
 
         //function to execute while we have lock
         let haveLock () =
