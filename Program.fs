@@ -458,6 +458,7 @@ type client (clientID, numLabs) =
         for n in 0 .. Array.length(lastKnownCoord) do
             let ownerId = this.askOthersForOwner n
             (!clients).[ownerId].addToQueue n this.ClientID
+        //ignore(printfn "Add me to queues")
  
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
@@ -498,7 +499,9 @@ type client (clientID, numLabs) =
             this.addMeToQueues()
 
         // lock this client
+        prStr "About to lock" ""
         lock this haveLock
+        prStr "Ok, I have lock" ""
         // wait for the lock to be released
         waitFor this
         result
