@@ -469,7 +469,7 @@ type client (clientID, numLabs) =
                 let id = lastKnownCoord.[n]
                 let cli = (!clients).[id]
                 cli.cancelMyRequest n clientID
-            (!labs).[lab].DoExp 50 A 1 (fun b -> ())
+            (!expr) lab
     
     ///releases a lab    
     member private this.releaseLab labID = match (!queue) with
