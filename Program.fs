@@ -458,7 +458,7 @@ type client (clientID, numLabs) =
     
     ///function to add yourself to all the lab queues
     member private this.addMeToQueues () =
-        for n in 0 .. Array.length(lastKnownCoord)-1 do
+        for n in 0 .. (Array.length(lastKnownCoord)-1) do
             let ownerId = this.askOthersForOwner n
             (!clients).[ownerId].addToQueue n this.ClientID
         //ignore(printfn "Add me to queues")
@@ -469,7 +469,7 @@ type client (clientID, numLabs) =
             lastKnownCoord.[lab] <- clientID
             queue := que
             for x in que do ignore((!clients).[x].updateHolder lab clientID)
-            for n in 0 .. Array.length(lastKnownCoord) do
+            for n in 0 .. (Array.length(lastKnownCoord)-1) do
                 let id = lastKnownCoord.[n]
                 let cli = (!clients).[id]
                 cli.cancelMyRequest n clientID
@@ -493,7 +493,7 @@ type client (clientID, numLabs) =
         let result = ref None
         // the function called when this client becomes lab master. Executes the lab DoExp, with a continuation that assigns the result and wakes
         // waiters when the lab is done.
-        let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> result := Some res; haveExpr := false; wakeWaiters this))
+        let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> result := Some res; haveExpr := false; wakeWaiters expr))
 
         //function to execute while we have lock
         let haveLock () =
@@ -503,10 +503,10 @@ type client (clientID, numLabs) =
 
         // lock this client
         prStr "About to lock" ""
-        lock this haveLock
+        lock expr haveLock
         prStr "Ok, I have lock" ""
         // wait for the lock to be released
-        waitFor this
+        waitFor expr
         result
 
 
