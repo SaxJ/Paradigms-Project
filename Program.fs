@@ -490,7 +490,7 @@ type client (clientID, numLabs) =
         let result = ref None
         // the function called when this client becomes lab master. Executes the lab DoExp, with a continuation that assigns the result and wakes
         // waiters when the lab is done.
-        let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> result := Some res; haveExpr := false; wakeWaiters this))
+        let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> result := Some res; haveExpr := false; wakeWaiters expr))
 
         //function to execute while we have lock
         let haveLock () =
@@ -500,10 +500,10 @@ type client (clientID, numLabs) =
 
         // lock this client
         prStr "About to lock" ""
-        lock this haveLock
+        lock expr haveLock
         prStr "Ok, I have lock" ""
         // wait for the lock to be released
-        waitFor this
+        waitFor expr
         result
 
 
