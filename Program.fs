@@ -421,19 +421,20 @@ type client (clientID, numLabs) =
     
     ///let others know of who we think is the owner of a lab is
     member this.askForOwner labID = let resp = ref None
-                                    lock lastKnownCoord (fun () -> resp := Some lastKnownCoord.[labID]) //store what to return
-                                    wakeWaiters lastKnownCoord //wake those waiting  
+                                    lock lastKnownCoord (fun () -> resp := Some lastKnownCoord.[labID]
+                                                                   wakeWaiters lastKnownCoord ) //store what to return
                                     Option.get(!resp) //give response                        
         
     ///allows clients to request that they be added to the queue
     member this.addToQueue labID clientID = lock lastKnownCoord (fun () -> //lock on last knowns
                                                 if lastKnownCoord.[labID] = this.ClientID then do
-                                                    lock queue (fun () -> queue:= (!queue)@[clientID]) //append to queue
-                                                    wakeWaiters queue
+                                                    lock queue (fun () -> queue:= (!queue)@[clientID] //append to queue
+                                                                          wakeWaiters queue) 
+
                                                     if not(!haveExpr) then this.releaseLab labID 
                                                 //forward the message if it was not for us
-                                                else do (!clients).[lastKnownCoord.[labID]].addToQueue labID clientID)
-                                            wakeWaiters lastKnownCoord
+                                                else do (!clients).[lastKnownCoord.[labID]].addToQueue labID clientID
+                                                wakeWaiters lastKnownCoord)
                                       
     ///allows clients to cancel their requests
     member this.cancelMyRequest labID (clientID:int) = lock lastKnownCoord (fun () ->
@@ -443,8 +444,8 @@ type client (clientID, numLabs) =
                                                                                   wakeWaiters lastKnownCoord))                                         
     
     ///update our mapping
-    member this.updateHolder labID clientID = ignore( lock lastKnownCoord (fun () -> lastKnownCoord.[labID] = clientID) )
-                                              wakeWaiters lastKnownCoord
+    member this.updateHolder labID clientID = lock lastKnownCoord (fun () -> Array.set lastKnownCoord labID clientID
+                                                                             wakeWaiters lastKnownCoord)
     
     ///performs an 'ownership lookup' and returns the owner's ID
     member private this.askOthersForOwner labID =
