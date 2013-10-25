@@ -420,7 +420,10 @@ type client (clientID, numLabs) =
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs
     
     ///let others know of who we think is the owner of a lab is
-    member this.askForOwner labID = lastKnownCoord.[labID]
+    member this.askForOwner labID = let resp = ref None
+                                    lock lastKnownCoord (fun () -> resp := Some lastKnownCoord.[labID]) //store what to return
+                                    wakeWaiters lastKnownCoord //wake those waiting  
+                                    Option.get(!resp) //give response                        
         
     ///allows clients to request that they be added to the queue
     member this.addToQueue labID clientID = if lastKnownCoord.[labID] = this.ClientID then do
@@ -455,7 +458,7 @@ type client (clientID, numLabs) =
     
     ///function to add yourself to all the lab queues
     member private this.addMeToQueues () =
-        for n in 0 .. Array.length(lastKnownCoord) do
+        for n in 0 .. Array.length(lastKnownCoord)-1 do
             let ownerId = this.askOthersForOwner n
             (!clients).[ownerId].addToQueue n this.ClientID
         //ignore(printfn "Add me to queues")
