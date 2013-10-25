@@ -435,7 +435,8 @@ type client (clientID, numLabs) =
                                                         queue := [ for cl in !queue do if not(cl = clientID) then yield cl ]                                             
     
     ///update our mapping
-    member this.updateHolder labID clientID = lastKnownCoord.[labID] = clientID
+    member this.updateHolder labID clientID = ignore( lock lastKnownCoord (fun () -> lastKnownCoord.[labID] = clientID) )
+                                              wakeWaiters lastKnownCoord
     
     ///performs an 'ownership lookup' and returns the owner's ID
     member private this.askOthersForOwner labID =
