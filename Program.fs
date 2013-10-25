@@ -434,8 +434,11 @@ type client (clientID, numLabs) =
                                             else do (!clients).[lastKnownCoord.[labID]].addToQueue labID clientID
                                       
     ///allows clients to cancel their requests
-    member this.cancelMyRequest labID (clientID:int) = if lastKnownCoord.[labID] = this.ClientID then do    
-                                                        queue := [ for cl in !queue do if not(cl = clientID) then yield cl ]                                             
+    member this.cancelMyRequest labID (clientID:int) = lock lastKnownCoord (fun () ->
+                                                        if lastKnownCoord.[labID] = this.ClientID then do
+                                                            lock queue (fun () -> queue := [ for cl in !queue do if not(cl = clientID) then yield cl ]
+                                                                                  wakeWaiters queue
+                                                                                  wakeWaiters lastKnownCoord))                                         
     
     ///update our mapping
     member this.updateHolder labID clientID = ignore( lock lastKnownCoord (fun () -> lastKnownCoord.[labID] = clientID) )
