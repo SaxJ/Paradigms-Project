@@ -517,7 +517,8 @@ type client (clientID, numLabs) =
         prStr "About to lock" ""
         lock expr haveLock
         prStr "Ok, I have lock" ""
-        while (!haveExpr) do waitFor haveExpr 
+        lock haveExpr (fun () -> while (!haveExpr) do waitFor haveExpr
+                                 wakeWaiters haveExpr ) 
         result
 
 
