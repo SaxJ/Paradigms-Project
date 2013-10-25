@@ -455,7 +455,7 @@ type client (clientID, numLabs) =
     
     ///function to add yourself to all the lab queues
     member private this.addMeToQueues () =
-        for n in 0 .. Array.length(lastKnownCoord) do
+        for n in 0 .. (Array.length(lastKnownCoord)-1) do
             let ownerId = this.askOthersForOwner n
             (!clients).[ownerId].addToQueue n this.ClientID
         //ignore(printfn "Add me to queues")
@@ -466,7 +466,7 @@ type client (clientID, numLabs) =
             lastKnownCoord.[lab] <- clientID
             queue := que
             for x in que do ignore((!clients).[x].updateHolder lab clientID)
-            for n in 0 .. Array.length(lastKnownCoord) do
+            for n in 0 .. (Array.length(lastKnownCoord)-1) do
                 let id = lastKnownCoord.[n]
                 let cli = (!clients).[id]
                 cli.cancelMyRequest n clientID
