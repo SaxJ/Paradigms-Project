@@ -470,6 +470,7 @@ type client (clientID, numLabs) =
     ///function to add yourself to all the lab queues
     member private this.addMeToQueues () =
                 for n in 0 .. (Array.length(lastKnownCoord)-1) do
+                    prStr (sprintf "Asking client %d to put me on queue for lab %d." lastKnownCoord.[n] n) ""
                     (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
  
     /// called when you're being told to take a lab
@@ -501,16 +502,15 @@ type client (clientID, numLabs) =
 
         // lock this client
         //prStr "Locking expr" ""
-        (*lock expr (fun () ->
+        let haveLock() =
             haveExpr := true
             expr := doOnOwner
             this.addMeToQueues()
-            wakeWaiters expr)*)
+            wakeWaiters expr
+
+        lock expr haveLock
         
-        lock haveExpr (fun () -> haveExpr := true
-                                 expr := doOnOwner
-                                 this.addMeToQueues()
-                                 while (!haveExpr) do waitFor haveExpr)
+        lock haveExpr (fun () -> while (!haveExpr) do waitFor haveExpr)
 
         result
 
