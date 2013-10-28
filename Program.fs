@@ -514,8 +514,11 @@ type client (clientID, numLabs) =
         // the function called when this client becomes lab master. Executes the lab DoExp, with a continuation that assigns the result and wakes
         // waiters when the lab is done.
         let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> 
+                                        prLock "haveExpr" "doOnOwner" 1
                                         lock haveExpr (fun () -> 
-                                            result := Some res; lab := id; haveExpr := false; wakeWaiters haveExpr)))
+                                            prLock "haveExpr" "doOnOwner" 2
+                                            result := Some res; lab := id; haveExpr := false; wakeWaiters haveExpr)
+                                        prLock "haveExpr" "doOnOwner" 3))
         //TODO will need to function to call when another lab suffices, will remove us from queues and return the result
 
         // lock this client
