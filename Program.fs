@@ -425,24 +425,25 @@ type client (clientID, numLabs) =
                                     Option.get(!resp) //give response                        
         
     ///allows clients to request that they be added to the queue
-    member this.addToQueue labID clientID = if lastKnownCoord.[labID] = this.ClientID then do
-                                                lock queue (fun () -> queue:= (!queue)@[clientID] //append to queue
+    member this.addToQueue labID clID = if lastKnownCoord.[labID] = this.ClientID then do
+                                                lock queue (fun () -> prStr(sprintf "Client %d added %d to their queue" clientID clID) ""
+                                                                      queue:= (!queue)@[clID] //append to queue
                                                                       wakeWaiters queue) 
                                                 if not(!haveExpr) then this.releaseLab labID 
                                             //forward the message if it was not for us
                                             else 
-                                                (!clients).[lastKnownCoord.[labID]].addToQueue labID clientID
+                                                (!clients).[lastKnownCoord.[labID]].addToQueue labID clID
                                       
     ///allows clients to cancel their requests
-    member this.cancelMyRequest labID (clientID:int) = if lastKnownCoord.[labID] = this.ClientID then do
-                                                            lock queue (fun () -> queue := [ for cl in !queue do if not(cl = clientID) then yield cl ]
+    member this.cancelMyRequest labID (clID:int) = if lastKnownCoord.[labID] = this.ClientID then do
+                                                            lock queue (fun () -> queue := [ for cl in !queue do if not(cl = clID) then yield cl ]
                                                                                   wakeWaiters queue)
                                                        else
-                                                            (!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clientID                  
+                                                            (!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID                  
     
     ///update our mapping
-    member this.updateHolder labID clientID = lock lastKnownCoord (fun () -> Array.set lastKnownCoord labID clientID
-                                                                             wakeWaiters lastKnownCoord)
+    member this.updateHolder labID clID = lock lastKnownCoord (fun () -> Array.set lastKnownCoord labID clID
+                                                                         wakeWaiters lastKnownCoord)
     
     ///performs an 'ownership lookup' and returns the owner's ID
     member private this.askOthersForOwner labID =
@@ -466,16 +467,16 @@ type client (clientID, numLabs) =
         (!correctOwner)
     
     ///function to add yourself to all the lab queues
-    member private this.addMeToQueues () =
-                for n in 0 .. (Array.length(lastKnownCoord)-1) do
-                    prStr (sprintf "Asking client %d to put me on queue for lab %d." lastKnownCoord.[n] n) ""
-                    (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
+    member private this.addMeToQueues () = lock lastKnownCoord (fun () -> for n in 0 .. (Array.length(lastKnownCoord)-1) do
+                                                                            prStr (sprintf "Asking client %d to put me on queue for lab %d." lastKnownCoord.[n] n) ""
+                                                                            (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID)
  
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
+        prStr(sprintf "Client %d just got told it now owns lab %d" clientID lab) ""
         if !haveExpr then do
             lastKnownCoord.[lab] <- clientID //should probably lock on this before changing
-            queue := que
+            queue := que //should lock on queue also
             //inform those under me that i am their overlord now
             for x in que do ignore((!clients).[x].updateHolder lab clientID)
             //cancel peoples requests
@@ -486,19 +487,21 @@ type client (clientID, numLabs) =
             (!expr) lab
     
     ///releases a lab    
-    member private this.releaseLab labID = lock queue (fun () -> match (!queue) with
-                                                                 | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
-                                                                             ignore(this.updateHolder labID h)
-                                                                 | [] -> ())
+    member private this.releaseLab labID =  prStr(sprintf "Client %d attempting to release lab %d" clientID labID) ""
+                                            lock queue (fun () -> match (!queue) with
+                                                                  | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
+                                                                              ignore(this.updateHolder labID h)
+                                                                  | [] -> ())
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =
         let result = ref None
+        let lab = ref -1
         // the function called when this client becomes lab master. Executes the lab DoExp, with a continuation that assigns the result and wakes
         // waiters when the lab is done.
         let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> 
                                         lock haveExpr (fun () -> 
-                                            result := Some res; haveExpr := false; wakeWaiters haveExpr)))
+                                            result := Some res; lab := id; haveExpr := false; wakeWaiters haveExpr)))
 
         // lock this client
         //prStr "Locking expr" ""
@@ -511,7 +514,7 @@ type client (clientID, numLabs) =
         lock expr haveLock
         
         lock haveExpr (fun () -> while (!haveExpr) do waitFor haveExpr)
-
+        this.releaseLab  (!lab) //we are done - release the lab
         result
 
 
