@@ -426,7 +426,7 @@ type client (clientID, numLabs) =
         
     ///allows clients to request that they be added to the queue
     member this.addToQueue labID clID = if lastKnownCoord.[labID] = this.ClientID then do
-                                                lock queue (fun () -> prStr(sprintf "Client %d added %d to their queue" clientID clID) ""
+                                                lock queue (fun () -> prStr(sprintf "Added %d to their queue" clID) ""
                                                                       queue:= (!queue)@[clID] //append to queue
                                                                       wakeWaiters queue) 
                                                 if not(!haveExpr) then this.releaseLab labID 
@@ -473,7 +473,7 @@ type client (clientID, numLabs) =
  
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
-        prStr(sprintf "Client %d just got told it now owns lab %d" clientID lab) ""
+        prStr(sprintf "Just got told it now owns lab %d" lab) ""
         if !haveExpr then do
             lastKnownCoord.[lab] <- clientID //should probably lock on this before changing
             queue := que //should lock on queue also
@@ -487,7 +487,7 @@ type client (clientID, numLabs) =
             (!expr) lab
     
     ///releases a lab    
-    member private this.releaseLab labID =  prStr(sprintf "Client %d attempting to release lab %d" clientID labID) ""
+    member private this.releaseLab labID =  prStr(sprintf "Attempting to release lab %d" labID) ""
                                             lock queue (fun () -> match (!queue) with
                                                                   | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
                                                                               ignore(this.updateHolder labID h)
