@@ -421,8 +421,7 @@ type client (clientID, numLabs) =
     
     ///let others know of who we think is the owner of a lab is
     member this.askForOwner labID = let resp = ref None
-                                    lock lastKnownCoord (fun () -> resp := Some lastKnownCoord.[labID]
-                                                                   wakeWaiters lastKnownCoord ) //store what to return
+                                    lock lastKnownCoord (fun () -> resp := Some lastKnownCoord.[labID]) //store what to return
                                     Option.get(!resp) //give response                        
         
     ///allows clients to request that they be added to the queue
@@ -462,8 +461,7 @@ type client (clientID, numLabs) =
             correctOwner := lastKnownCoord.[labID]
             //inform others
             for cl in forwarders do
-                ignore( (!clients).[cl].updateHolder labID (!correctOwner) )
-            wakeWaiters lastKnownCoord)
+                ignore( (!clients).[cl].updateHolder labID (!correctOwner) ))
         //return owner
         (!correctOwner)
     
@@ -476,9 +474,11 @@ type client (clientID, numLabs) =
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
         if !haveExpr then do
-            lastKnownCoord.[lab] <- clientID
+            lastKnownCoord.[lab] <- clientID //should probably lock on this before changing
             queue := que
+            //inform those under me that i am their overlord now
             for x in que do ignore((!clients).[x].updateHolder lab clientID)
+            //cancel peoples requests
             for n in 0 .. (Array.length(lastKnownCoord)-1) do
                 let id = lastKnownCoord.[n]
                 let cli = (!clients).[id]
@@ -486,10 +486,10 @@ type client (clientID, numLabs) =
             (!expr) lab
     
     ///releases a lab    
-    member private this.releaseLab labID = match (!queue) with
-                                                   | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
-                                                               ignore(this.updateHolder labID h)
-                                                   | [] -> ()
+    member private this.releaseLab labID = lock queue (fun () -> match (!queue) with
+                                                                 | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
+                                                                             ignore(this.updateHolder labID h)
+                                                                 | [] -> ())
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =
