@@ -425,31 +425,30 @@ type client (clientID, numLabs) =
                                     Option.get(!resp) //give response                        
         
     ///allows clients to request that they be added to the queue
-    member this.addToQueue labID clID = lock queue (fun () -> 
+    member this.addToQueue labID clID = if lastKnownCoord.[labID] <> this.ClientID then do //forward message
+                                               (!clients).[lastKnownCoord.[labID]].addToQueue labID clID
+                                        else lock queue (fun () -> 
                                             if this.ClientID = clID then do//asking ourselves? 
                                                 prStr "Handing over my own lab" ""
                                                 queue:= [clID]@(!queue) //append to queue                       
                                                 this.releaseLab labID
-                                            else if lastKnownCoord.[labID] = this.ClientID then do
-                                                    prStr(sprintf "Added %d to their queue" clID) ""
-                                                    queue:= (!queue)@[clID] //append to queue 
-                                                    if not(!haveExpr) then this.releaseLab labID 
-                                                //forward the message if it was not for us
                                             else 
-                                                    (!clients).[lastKnownCoord.[labID]].addToQueue labID clID
+                                                prStr(sprintf "Added %d to their queue" clID) ""
+                                                queue:= (!queue)@[clID] //append to queue 
+                                                if not(!haveExpr) then this.releaseLab labID 
+                                                //forward the message if it was not for us
                                             wakeWaiters queue)
                                       
     ///allows clients to cancel their requests
-    member this.cancelMyRequest labID (clID:int) = lock queue (fun () -> 
-                                                        if lastKnownCoord.[labID] = this.ClientID then do
-                                                                prStr(sprintf "Cancelled request for %d" clID) ""
-                                                                queue := [ for cl in !queue do if not(cl = clID) then yield cl ]
-                                                        else
-                                                            (!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID   
-                                                        wakeWaiters queue)               
+    member this.cancelMyRequest labID (clID:int) = if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
+                                                        (!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID
+                                                   else lock queue (fun () -> 
+                                                            prStr(sprintf "Cancelled request for %d" clID) ""
+                                                            queue := [ for cl in !queue do if not(cl = clID) then yield cl ]                                                              
+                                                            wakeWaiters queue)               
     
     ///update our mapping
-    member this.updateHolder labID clID = lock lastKnownCoord ( fun () -> prStr(sprintf "just got told client %d owns lab %d" clID labID) ""
+    member this.updateHolder labID clID = lock lastKnownCoord ( fun () -> prStr(sprintf "Just got told client %d owns lab %d" clID labID) ""
                                                                           Array.set lastKnownCoord labID clID
                                                                           wakeWaiters lastKnownCoord)
     
@@ -486,14 +485,14 @@ type client (clientID, numLabs) =
         lock lastKnownCoord (fun () -> lastKnownCoord.[lab] <- clientID)
         lock queue (fun () -> queue := que) 
         //inform those under me that i am their overlord now
-        for x in que do ignore(prStr(sprintf "going to tell %d I own lab %d" x lab) ""; (!clients).[x].updateHolder lab clientID)
+        for x in que do ignore(prStr(sprintf "Going to tell %d I own lab %d" x lab) ""; (!clients).[x].updateHolder lab clientID)
         //cancel my requests
-        prStr "cancelling requests for other labs" ""
+        prStr "Cancelling requests for other labs" ""
         for n in 0 .. (Array.length(lastKnownCoord)-1) do
             let id = lastKnownCoord.[n]
             let cli = (!clients).[id]
             cli.cancelMyRequest n clientID
-        prStr(sprintf "running expr on lab %d" lab) ""
+        prStr(sprintf "Running expr on lab %d" lab) ""
         (!expr) lab
     
     ///releases a lab    
