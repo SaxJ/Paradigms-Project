@@ -414,7 +414,7 @@ type client (clientID, numLabs) =
                                            | 1 -> prStr "Attemping to lock " (sprintf "%s in %s" objectName funcname)
                                            | 2 -> prStr "Locked " (sprintf "%s in %s" objectName funcname)
                                            | 3 -> prStr "Released " (sprintf "%s in %s" objectName funcname)
-                                           | _ ()
+                                           | _ -> ()
     
     ///holds the list of people waiting to use my lab
     let queue = ref []
