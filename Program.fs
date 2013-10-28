@@ -431,11 +431,11 @@ type client (clientID, numLabs) =
                                         lock queue (fun () -> 
                                              prLock "queue" "addToQueue" 2
                                              if lastKnownCoord.[labID] <> this.ClientID then do //forward message
-                                                (!clients).[lastKnownCoord.[labID]].addToQueue labID clID
+                                                ignore( async{ (!clients).[lastKnownCoord.[labID]].addToQueue labID clID } ) //let function finish when calling
                                              else 
                                                 if this.ClientID = clID then do//asking ourselves? 
                                                      prStr "Handing over my own lab" ""
-                                                     this.useLab labID //just use the lab, dont inform others - they should already know
+                                                     ignore( async{ this.useLab labID } ) //just use the lab, dont inform others - they should already know
                                                 else 
                                                      prStr(sprintf "Added %d to their queue" clID) ""
                                                      queue:= (!queue)@[clID] //append to queue 
@@ -449,7 +449,7 @@ type client (clientID, numLabs) =
                                              lock queue (fun () -> 
                                                      prLock "queue" "cancelMyRequest" 2
                                                      if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
-                                                                (!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID
+                                                                ignore( async{ (!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID } )
                                                      else prStr(sprintf "Cancelled request for %d" clID) ""
                                                           queue := [ for cl in !queue do if not(cl = clID) then yield cl ]                                                              
                                                           wakeWaiters queue)
@@ -527,7 +527,7 @@ type client (clientID, numLabs) =
         
         prLock "haveExpr" "DoExp" 1
         lock haveExpr (fun () -> prLock "haveExpr" "DoExp" 2
-                                 while (!haveExpr) do waitFor haveExpr)
+                                 waitFor haveExpr)
         prLock "haveExpr" "DoExp" 3
         //TODO check sufficiency for queuers before releasing
             //TODO if sufficient, give them result and remove them from queue            
