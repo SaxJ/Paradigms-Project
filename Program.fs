@@ -513,7 +513,8 @@ type client (clientID, numLabs) =
         let lab = ref -1
         // the function called when this client becomes lab master. Executes the lab DoExp, with a continuation that assigns the result and wakes
         // waiters when the lab is done.
-        let doOnOwner = (fun id -> (!labs).[id].DoExp delay exp clientID (fun res -> 
+        let doOnOwner = (fun id -> prStr (sprintf "Running exp %A on lab %d" exp id) ""
+                                   (!labs).[id].DoExp delay exp clientID (fun res -> 
                                         prLock "haveExpr" "doOnOwner" 1
                                         lock haveExpr (fun () -> 
                                             prLock "haveExpr" "doOnOwner" 2
