@@ -536,7 +536,14 @@ type client (clientID, numLabs) =
                                                                   | [] -> ())
                                             prLock "queue" "releaseLab" 3
 
-    member private this.useLab labID = (!expr) labID
+    member private this.useLab labID = //cancel my requests
+                                       prStr "Cancelling requests for other labs" ""
+                                       for n in 0 .. (Array.length(lastKnownCoord)-1) do
+                                            let id = lastKnownCoord.[n]
+                                            let cli = (!clients).[id]
+                                            cli.cancelMyRequest n clientID
+                                       prStr(sprintf "Running expr on lab %d" labID) ""
+                                       (!expr) labID //run
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =
