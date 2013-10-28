@@ -493,7 +493,7 @@ type client (clientID, numLabs) =
                                             lock queue (fun () -> prLock "queue" "releaseLab" 2
                                                                   prStr(sprintf "Attempting to release lab %d" labID) ""
                                                                   match (!queue) with
-                                                                  | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
+                                                                  | h :: t -> Async.Start(async{(!clients).[h].acceptOwnership labID t})
                                                                               ignore(this.updateHolder labID h)
                                                                   | [] -> ())
                                             prLock "queue" "releaseLab" 3
