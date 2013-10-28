@@ -424,99 +424,61 @@ type client (clientID, numLabs) =
     let (haveExpr:bool ref) = ref false
 
     member this.ClientID = clientID  // So other clients can find our ID easily
-    member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs
-        
-    ///let others know of who we think is the owner of a lab is
-    member this.askForOwner labID = let resp = ref None
-                                    prLock "lastKnownCoord" "askForOwner" 1
-                                    lock lastKnownCoord (fun () -> prLock "lastKnownCoord" "askForOwner" 2
-                                                                   resp := Some lastKnownCoord.[labID]) //store what to return
-                                    prLock "lastKnownCoord" "askForOwner" 3
-                                    Option.get(!resp) //give response                        
+    member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs                    
         
     ///allows clients to request that they be added to the queue
-    member this.addToQueue labID clID = if lastKnownCoord.[labID] <> this.ClientID then do //forward message
-                                               (!clients).[lastKnownCoord.[labID]].addToQueue labID clID
-                                        else 
-                                            prLock "queue" "addToQueue" 1
-                                            lock queue (fun () -> 
-                                                prLock "queue" "addToQueue" 2
+    member this.addToQueue labID clID = prLock "queue" "addToQueue" 1
+                                        lock queue (fun () -> 
+                                             prLock "queue" "addToQueue" 2
+                                             if lastKnownCoord.[labID] <> this.ClientID then do //forward message
+                                                (!clients).[lastKnownCoord.[labID]].addToQueue labID clID
+                                             else 
                                                 if this.ClientID = clID then do//asking ourselves? 
-                                                    prStr "Handing over my own lab" ""
-                                                    this.useLab labID //just use the lab, dont inform others - they should already know
+                                                     prStr "Handing over my own lab" ""
+                                                     this.useLab labID //just use the lab, dont inform others - they should already know
                                                 else 
-                                                    prStr(sprintf "Added %d to their queue" clID) ""
-                                                    queue:= (!queue)@[clID] //append to queue 
-                                                    if not(!haveExpr) then this.releaseLab labID 
-                                                    //forward the message if it was not for us
-                                                wakeWaiters queue)
-                                            prLock "queue" "addToQueue" 3
+                                                     prStr(sprintf "Added %d to their queue" clID) ""
+                                                     queue:= (!queue)@[clID] //append to queue 
+                                                     if not(!haveExpr) then this.releaseLab labID 
+                                                     //forward the message if it was not for us
+                                                     wakeWaiters queue)
+                                        prLock "queue" "addToQueue" 3
                                       
     ///allows clients to cancel their requests
-    member this.cancelMyRequest labID clID = if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
-                                                        (!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID
-                                             else prLock "queue" "cancelMyRequest" 1
-                                                  lock queue (fun () -> 
+    member this.cancelMyRequest labID clID = prLock "queue" "cancelMyRequest" 1
+                                             lock queue (fun () -> 
                                                      prLock "queue" "cancelMyRequest" 2
-                                                     prStr(sprintf "Cancelled request for %d" clID) ""
-                                                     queue := [ for cl in !queue do if not(cl = clID) then yield cl ]                                                              
-                                                     wakeWaiters queue)
-                                                  prLock "queue" "cancelMyRequest" 3               
+                                                     if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
+                                                                (!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID
+                                                     else prStr(sprintf "Cancelled request for %d" clID) ""
+                                                          queue := [ for cl in !queue do if not(cl = clID) then yield cl ]                                                              
+                                                          wakeWaiters queue)
+                                             prLock "queue" "cancelMyRequest" 3               
     
     ///update our mapping
-    member this.updateHolder labID clID = prLock "lastKnownCoord" "updateHolder" 1
-                                          lock lastKnownCoord ( fun () -> prLock "lastKnownCoord" "updateHolder" 2
-                                                                          prStr(sprintf "Just got told client %d owns lab %d" clID labID) ""
-                                                                          Array.set lastKnownCoord labID clID
-                                                                          wakeWaiters lastKnownCoord)
-                                          prLock "lastKnownCoord" "updateHolder" 3
-    
-    ///performs an 'ownership lookup' and returns the owner's ID
-    member private this.askOthersForOwner labID =
-        //a recursive function to find the true owner while building a list is 'forwarders'
-        let rec ask client = match (!clients).[client].askForOwner labID with
-                             | c -> if c = client then 
-                                        ignore( this.updateHolder labID c )
-                                        []
-                                    else 
-                                        c :: ask c
-        //initiate lookup and store list of forwarding partys
-        let correctOwner = ref -1
-        prLock "lastKnownCoord" "askOthersForOwner" 1
-        lock lastKnownCoord (fun () ->
-            prLock "lastKnownCoord" "askOthersForOwner" 2
-            let forwarders = ask lastKnownCoord.[labID]
-            //locally store the final correct owner
-            correctOwner := lastKnownCoord.[labID]
-            //inform others
-            for cl in forwarders do
-                ignore( (!clients).[cl].updateHolder labID (!correctOwner) ))
-        prLock "lastKnownCoord" "askOthersForOwner" 3
-        //return owner
-        (!correctOwner)
+    member this.updateHolder labID clID = prStr(sprintf "Just got told client %d owns lab %d" clID labID) ""
+                                          Array.set lastKnownCoord labID clID
     
     ///function to add yourself to all the lab queues
-    member private this.addMeToQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
-                                                prLock "lastKnownCoord" "addMeToQueues" 1
-                                                lock lastKnownCoord (fun () -> prLock "lastKnownCoord" "addMeToQueues" 2
+    member private this.addMeToQueues () = prLock "lastKnownCoord" "addMeToQueues" 1
+                                           lock lastKnownCoord (fun () -> prLock "lastKnownCoord" "addMeToQueues" 2
+                                                                          for n in 0 .. (Array.length(lastKnownCoord)-1) do 
                                                                                prStr (sprintf "Asking client %d to put me on queue for lab %d." lastKnownCoord.[n] n) ""
                                                                                (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID)
-                                                prLock "lastKnownCoord" "addMeToQueues" 3
+                                           prLock "lastKnownCoord" "addMeToQueues" 3
  
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
         prStr(sprintf "Just got told it now owns lab %d" lab) ""
         //if !haveExpr then do    -- we shouldnt be given a lab unless we wanted it
-        prLock "lastKnownCoord" "acceptOwnership" 1
-        lock lastKnownCoord (fun () -> prLock "lastKnownCoord" "acceptOwnership" 2
-                                       lastKnownCoord.[lab] <- clientID)
-        prLock "lastKnownCoord" "acceptOwnership" 3
+        Array.set lastKnownCoord lab clientID //I am the owner now!
         prLock "queue" "acceptOwnership" 1
         lock queue (fun () -> prLock "queue" "acceptOwnership" 2
-                              queue := que) 
+                              queue := que
+                              //inform those under me that i am their overlord now
+                              for x in (!queue) do ignore(prStr(sprintf "Going to tell %d I own lab %d" x lab) ""; (!clients).[x].updateHolder lab clientID)
+                              wakeWaiters queue)
         prLock "queue" "acceptOwnership" 3
-        //inform those under me that i am their overlord now
-        for x in que do ignore(prStr(sprintf "Going to tell %d I own lab %d" x lab) ""; (!clients).[x].updateHolder lab clientID)
         //cancel my requests
         prStr "Cancelling requests for other labs" ""
         for n in 0 .. (Array.length(lastKnownCoord)-1) do
@@ -574,7 +536,7 @@ type client (clientID, numLabs) =
         prLock "haveExpr" "DoExp" 3
         //TODO check sufficiency for queuers before releasing
             //TODO if sufficient, give them result and remove them from queue            
-        this.releaseLab  (!lab) //we are done - release the lab
+        this.releaseLab (!lab) //we are done - release the lab
         result
 
 
