@@ -430,8 +430,7 @@ type client (clientID, numLabs) =
                                         else lock queue (fun () -> 
                                             if this.ClientID = clID then do//asking ourselves? 
                                                 prStr "Handing over my own lab" ""
-                                                queue:= [clID]@(!queue) //append to queue                       
-                                                this.releaseLab labID
+                                                this.useLab labID //just use the lab, dont inform others - they should already know
                                             else 
                                                 prStr(sprintf "Added %d to their queue" clID) ""
                                                 queue:= (!queue)@[clID] //append to queue 
@@ -496,11 +495,13 @@ type client (clientID, numLabs) =
         (!expr) lab
     
     ///releases a lab    
-    member private this.releaseLab labID =  prStr(sprintf "Attempting to release lab %d" labID) ""
-                                            lock queue (fun () -> match (!queue) with
+    member private this.releaseLab labID =  lock queue (fun () -> prStr(sprintf "Attempting to release lab %d" labID) ""
+                                                                  match (!queue) with
                                                                   | h :: t -> ignore( (!clients).[h].acceptOwnership labID t )
                                                                               ignore(this.updateHolder labID h)
                                                                   | [] -> ())
+
+    member private this.useLab labID = (!expr) labID
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =
