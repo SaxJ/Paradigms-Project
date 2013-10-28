@@ -521,8 +521,8 @@ type client (clientID, numLabs) =
                                         prLock "haveExpr" "doOnOwner" 3))
         //TODO will need to function to call when another lab suffices, will remove us from queues and return the result
 
-        haveExpr := true
         expr := doOnOwner
+        haveExpr := true
         this.addMeToQueues()
         
         prLock "haveExpr" "DoExp" 1
