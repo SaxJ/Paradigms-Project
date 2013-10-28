@@ -411,9 +411,9 @@ type client (clientID, numLabs) =
     
     ///for printing lock state  1 is attempt, 2 is locked, 3 is release
     let prLock objectName funcname state = match state with
-                                           | 1 -> prStr "Attemping to lock " (sprintf "%s in %s" objectName funcname)
-                                           | 2 -> prStr "Locked " (sprintf "%s in %s" objectName funcname)
-                                           | 3 -> prStr "Released " (sprintf "%s in %s" objectName funcname)
+                                           | 1 -> prStr "Attemping to lock" (sprintf "%s in %s" objectName funcname)
+                                           | 2 -> prStr "Locked" (sprintf "%s in %s" objectName funcname)
+                                           | 3 -> prStr "Released" (sprintf "%s in %s" objectName funcname)
                                            | _ -> ()
     
     ///holds the list of people waiting to use my lab
@@ -521,18 +521,10 @@ type client (clientID, numLabs) =
                                         prLock "haveExpr" "doOnOwner" 3))
         //TODO will need to function to call when another lab suffices, will remove us from queues and return the result
 
-        // lock this client
-        //prStr "Locking expr" ""
-        let haveLock() =
-            prLock "expr" "DoExp" 2
-            haveExpr := true
-            expr := doOnOwner
-            this.addMeToQueues()
-            wakeWaiters expr
+        haveExpr := true
+        expr := doOnOwner
+        this.addMeToQueues()
         
-        prLock "expr" "DoExp" 1
-        lock expr haveLock
-        prLock "expr" "DoExp" 3
         prLock "haveExpr" "DoExp" 1
         lock haveExpr (fun () -> prLock "haveExpr" "DoExp" 2
                                  while (!haveExpr) do waitFor haveExpr)
