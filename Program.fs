@@ -427,33 +427,37 @@ type client (clientID, numLabs) =
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs                    
         
     ///allows clients to request that they be added to the queue
-    member this.addToQueue labID clID = prLock "queue" "addToQueue" 1
-                                        lock queue (fun () -> 
-                                             prLock "queue" "addToQueue" 2
-                                             if lastKnownCoord.[labID] <> this.ClientID then do //forward message
-                                                Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID}) //let function finish when calling
-                                             else 
-                                                if this.ClientID = clID then do//asking ourselves? 
-                                                     prStr "Handing over my own lab" ""
-                                                     Async.Start(async{this.useLab labID}) //just use the lab, dont inform others - they should already know
-                                                else 
-                                                     prStr(sprintf "Added %d to their queue" clID) ""
-                                                     queue:= (!queue)@[clID] //append to queue 
-                                                     if not(!haveExpr) then this.releaseLab labID 
-                                                     //forward the message if it was not for us
-                                                     wakeWaiters queue)
-                                        prLock "queue" "addToQueue" 3
+    member this.addToQueue labID clID (fwdr:int list) = prLock "queue" "addToQueue" 1
+                                                        lock queue (fun () -> 
+                                                             prLock "queue" "addToQueue" 2
+                                                             if lastKnownCoord.[labID] <> this.ClientID then do //forward message
+                                                                Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID (clientID::fwdr)}) //let function finish when calling
+                                                             else 
+                                                                if this.ClientID = clID then do//asking ourselves? 
+                                                                    prStr "Handing over my own lab" ""
+                                                                    Async.Start(async{this.useLab labID}) //just use the lab, dont inform others - they should already know
+                                                                else 
+                                                                    prStr(sprintf "Added %d to their queue" clID) ""
+                                                                    queue:= (!queue)@[clID] //append to queue 
+                                                                    //inform forwarders of true owner
+                                                                    for x in fwdr do ignore(prStr(sprintf "Telling fwdr %d I own lab %d" x labID) ""; (!clients).[x].updateHolder labID clientID)
+                                                                    if not(!haveExpr) then this.releaseLab labID 
+                                                                    //forward the message if it was not for us
+                                                                    wakeWaiters queue)
+                                                        prLock "queue" "addToQueue" 3
                                       
     ///allows clients to cancel their requests
-    member this.cancelMyRequest labID clID = prLock "queue" "cancelMyRequest" 1
-                                             lock queue (fun () -> 
-                                                     prLock "queue" "cancelMyRequest" 2
-                                                     if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
-                                                                Async.Start(async{(!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID})
-                                                     else prStr(sprintf "Cancelled request for %d" clID) ""
-                                                          queue := [ for cl in !queue do if not(cl = clID) then yield cl ]                                                              
-                                                          wakeWaiters queue)
-                                             prLock "queue" "cancelMyRequest" 3               
+    member this.cancelMyRequest labID clID (fwdr:int list) = prLock "queue" "cancelMyRequest" 1
+                                                             lock queue (fun () -> 
+                                                                     prLock "queue" "cancelMyRequest" 2
+                                                                     if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
+                                                                                Async.Start(async{(!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID (clientID::fwdr)})
+                                                                     else prStr(sprintf "Cancelled request for %d" clID) ""
+                                                                          queue := [ for cl in !queue do if not(cl = clID) then yield cl ]  
+                                                                          //inform forwarders of true owner
+                                                                          for x in fwdr do ignore(prStr(sprintf "Telling fwdr %d I own lab %d" x labID) ""; (!clients).[x].updateHolder labID clientID)                                                            
+                                                                          wakeWaiters queue)
+                                                             prLock "queue" "cancelMyRequest" 3               
     
     ///update our mapping
     member this.updateHolder labID clID = prStr(sprintf "Just got told client %d owns lab %d" clID labID) ""
@@ -464,7 +468,7 @@ type client (clientID, numLabs) =
                                            lock lastKnownCoord (fun () -> prLock "lastKnownCoord" "addMeToQueues" 2
                                                                           for n in 0 .. (Array.length(lastKnownCoord)-1) do 
                                                                                prStr (sprintf "Asking client %d to put me on queue for lab %d." lastKnownCoord.[n] n) ""
-                                                                               (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID)
+                                                                               (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID [clientID])
                                            prLock "lastKnownCoord" "addMeToQueues" 3
  
     /// called when you're being told to take a lab
@@ -484,7 +488,7 @@ type client (clientID, numLabs) =
         for n in 0 .. (Array.length(lastKnownCoord)-1) do
             let id = lastKnownCoord.[n]
             let cli = (!clients).[id]
-            cli.cancelMyRequest n clientID
+            cli.cancelMyRequest n clientID [clientID]
         prStr(sprintf "Running expr on lab %d" lab) ""
         (!expr) lab
     
@@ -503,7 +507,7 @@ type client (clientID, numLabs) =
                                        for n in 0 .. (Array.length(lastKnownCoord)-1) do
                                             let id = lastKnownCoord.[n]
                                             let cli = (!clients).[id]
-                                            cli.cancelMyRequest n clientID
+                                            cli.cancelMyRequest n clientID [clientID]
                                        prStr(sprintf "Running expr on lab %d" labID) ""
                                        (!expr) labID //run
 
