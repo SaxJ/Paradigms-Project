@@ -488,7 +488,7 @@ type client (clientID, numLabs) =
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =
         let result = ref None
-        let lab = ref -1
+        let lab = ref 0
         let suffQueue = Array.init (Array.length (!clients)) (fun i -> false)
         // the function called when this client becomes lab master. Executes the lab DoExp, with a continuation that assigns the result and wakes
         // waiters when the lab is done.
@@ -500,6 +500,8 @@ type client (clientID, numLabs) =
                                                                                                      recursiveSuffice clID rules clExp
 
         let doOnOwner = (fun id -> lock queue <| fun () -> recursiveSuffice clientID (!labs).[id].Rules exp
+                                                           for x in 0 .. Array.length suffQueue-1 do
+                                                                if suffQueue.[x] then do (!clients).[x].removeFromQueues()
                                                            (!labs).[id].DoExp delay exp clientID (fun res -> 
                                                                 lock haveExpr (fun () -> 
                                                                     prStr "doOnOwner" ""
@@ -508,20 +510,18 @@ type client (clientID, numLabs) =
         let onToldResult = fun res ->   lock haveExpr (fun () ->
                                             prStr "onToldResult" "" 
                                             result := Some res; haveExpr := false; wakeWaiters haveExpr)
-
-        let onSuffice = false
-        //TODO will need to function to call when another lab suffices, will remove us from queues and return the result
-
-        expr := doOnOwner
-        experiment := exp
+        
         haveExpr := true
+        expr := doOnOwner
+        tellResult := onToldResult
+        experiment := exp
         this.addMeToQueues()
         
         lock haveExpr (fun () -> waitFor haveExpr)
 
         for x in 0 .. Array.length suffQueue-1 do
             if suffQueue.[x] then do (!clients).[x].TellResult result
-        if (!lab) <> -1 then do prStr "Releases because we're done" "";this.releaseLab (!lab) //we are done - release the lab if we own it
+        if lastKnownCoord.[!lab] = clientID then do prStr "Releases because we're done" "";this.releaseLab (!lab) //we are done - release the lab if we own it
         result
 
 
