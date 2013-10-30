@@ -453,6 +453,7 @@ type client (clientID, numLabs) =
                                                 (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
     /// checks whether someone is willing to accept a lab
     member this.willingToAccept () = not((!ownALab))
+    member this.setWaitForResult () = ownALab := true
  
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
@@ -480,10 +481,7 @@ type client (clientID, numLabs) =
                                                                                  this.releaseLab labID
                                                                   | [] -> ())
 
-    member private this.useLab labID = for n in 0 .. (Array.length(lastKnownCoord)-1) do
-                                            let id = lastKnownCoord.[n]
-                                            let cli = (!clients).[id]
-                                            cli.cancelMyRequest n clientID
+    member private this.useLab labID = this.removeFromQueues()
                                        (!expr) labID //run
 
     member this.removeFromQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
@@ -500,12 +498,14 @@ type client (clientID, numLabs) =
         let rec recursiveSuffice origCaller rules ex = for clID in !queue do
                                                             if not(suffQueue.[clID]) then
                                                                 let clExp = (!clients).[clID].getExpr()
-                                                                if (suffices rules (ex, clExp)) then Array.set suffQueue clID true
+                                                                if (suffices rules (ex, clExp)) then (!clients).[clID].setWaitForResult()
+                                                                                                     Array.set suffQueue clID true
                                                                                                      recursiveSuffice clID rules clExp
 
         let doOnOwner = (fun id -> lock queue <| fun () -> recursiveSuffice clientID (!labs).[id].Rules exp
                                                            for x in 0 .. Array.length suffQueue-1 do
-                                                                if suffQueue.[x] then do (!clients).[x].removeFromQueues()
+                                                                if suffQueue.[x] then do (!clients).[x].setWaitForResult()
+                                                                                         Async.Start(async{(!clients).[x].removeFromQueues()})
                                                            (!labs).[id].DoExp delay exp clientID (fun res -> 
                                                                 lock haveExpr (fun () -> 
                                                                     prStr "doOnOwner" ""
