@@ -415,7 +415,6 @@ type client (clientID, numLabs) =
     
     ///holds the experiment function to be run when I get the lab
     let (expr:(int -> unit) ref) = ref (fun _ -> ())
-    let (haveExpr:bool ref) = ref false
     let tellResult = ref (fun _ -> ())
     let experiment = ref A
 
@@ -431,11 +430,9 @@ type client (clientID, numLabs) =
                                                 Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID}) //let function finish when calling
                                              else 
                                                 if this.ClientID = clID then do//asking ourselves? 
-                                                     Async.Start(async{this.useLab labID}) //just use the lab, dont inform others - they should already know
+                                                     this.useLab labID //just use the lab, dont inform others - they should already know
                                                 else 
                                                      queue:= (!queue)@[clID] //append to queue 
-                                                     if not(!haveExpr) then prStr "Releases because we arent busy" ""; this.releaseLab labID 
-                                                     //forward the message if it was not for us
                                                      wakeWaiters queue)
                                       
     ///allows clients to cancel their requests
@@ -475,13 +472,15 @@ type client (clientID, numLabs) =
                                                                   match (!queue) with
                                                                   | h :: t -> let acceptance = (!clients).[h].willingToAccept()
                                                                               if acceptance then do
-                                                                                  Async.Start(async{(!clients).[h].acceptOwnership labID t})
+                                                                                  let fin = ref false;
+                                                                                  (!clients).[h].acceptOwnership labID t
                                                                                   ignore(this.updateHolder labID h)
                                                                                   ownALab := false
                                                                               else
                                                                                  queue := t
                                                                                  this.releaseLab labID
-                                                                  | [] -> ())
+                                                                  //release the lab once somebody wants it
+                                                                  | [] -> waitFor queue; this.releaseLab labID)
 
     member private this.useLab labID = this.removeFromQueues()
                                        (!expr) labID //run
@@ -509,21 +508,20 @@ type client (clientID, numLabs) =
                                                            //     if suffQueue.[x] then do (!clients).[x].setWaitForResult()
                                                            //                              Async.Start(async{(!clients).[x].removeFromQueues()})
                                                            (!labs).[id].DoExp delay exp clientID (fun res -> 
-                                                                lock haveExpr (fun () -> 
+                                                                lock result (fun () -> 
                                                                     prStr "doOnOwner" ""
-                                                                    result := Some res; lab := id; haveExpr := false; wakeWaiters haveExpr)))
+                                                                    result := Some res; lab := id; wakeWaiters result)))
 
-        let onToldResult = fun res ->   lock haveExpr (fun () ->
+        let onToldResult = fun res ->   lock result (fun () ->
                                             prStr "onToldResult" "" 
-                                            result := Some res; haveExpr := false; wakeWaiters haveExpr)
+                                            result := Some res; wakeWaiters result)
         
-        haveExpr := true
         expr := doOnOwner
         tellResult := onToldResult
         experiment := exp
         this.addMeToQueues()
         
-        lock haveExpr (fun () -> waitFor haveExpr)
+        lock result (fun () -> waitFor result)
 
         for x in 0 .. Array.length suffQueue-1 do
             if suffQueue.[x] then do (!clients).[x].TellResult (Option.get !result)
