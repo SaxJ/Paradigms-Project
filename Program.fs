@@ -541,14 +541,15 @@ type client (clientID, numLabs) =
         
         lock result (fun () -> if !result = None then waitFor result) //wait for a result
         prStr "got a result and doing finish" ""
-        for x in (!suffQueue) do
-            (!clients).[x].TellResult (Option.get !result) //tell sufficiencies the result
-        prStr "got past telling sufficiencies" ""
-        if lastKnownCoord.[!lab] = clientID then do 
-            prStr "Releases because we're done" ""
-            this.releaseLab (!lab) true //we are done - release the lab if we own it
-        else 
-            lock ownALab (fun() -> ownALab := false);
+        lock ownALab <| fun () ->
+            for x in (!suffQueue) do
+                (!clients).[x].TellResult (Option.get !result) //tell sufficiencies the result
+            prStr "got past telling sufficiencies" ""
+            if lastKnownCoord.[!lab] = clientID then do 
+                prStr "Releases because we're done" ""
+                this.releaseLab (!lab) true //we are done - release the lab if we own it
+            else 
+                ownALab := false
         result
 
 
