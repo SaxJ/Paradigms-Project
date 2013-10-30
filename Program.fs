@@ -410,7 +410,7 @@ type client (clientID, numLabs) =
     let pr (pre:string) res = prStr pre (sprintf "%A" res); res
     
     ///holds the list of people waiting to use my lab
-    let queue = ref [clientID]
+    let queue = ref []
     let ownALab = ref (clientID < numLabs)
     
     ///holds the experiment function to be run when I get the lab
@@ -431,6 +431,7 @@ type client (clientID, numLabs) =
                                                 Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID}) //let function finish when calling
                                              else 
                                                 let nQueue = (!queue)@[clID]
+                                                ignore (pr (sprintf "Added %d to lab %d" clID labID ) nQueue)
                                                 if this.ClientID = clID then do//asking ourselves? 
                                                      queue:= nQueue
                                                      this.useLab labID //just use the lab, dont inform others - they should already know
@@ -483,11 +484,11 @@ type client (clientID, numLabs) =
         })
     
     ///releases a lab    
-    member private this.releaseLab labID =  lock queue (fun () -> ignore( pr "Queue when releasing" queue )
-                                                                  queue := List.tail (!queue)
+    member private this.releaseLab labID =  lock queue (fun () -> queue := List.tail (!queue)
                                                                   match (!queue) with
                                                                   | h :: t -> let acceptance = (!clients).[h].willingToAccept()
                                                                               if acceptance then do
+                                                                                  ignore( pr "Queue when releasing" queue )
                                                                                   (!clients).[h].acceptOwnership labID (!queue)
                                                                                   ignore(this.updateHolder labID h)
                                                                                   ownALab := false
@@ -533,10 +534,11 @@ type client (clientID, numLabs) =
 
         this.addMeToQueues();
         
-        lock result (fun () -> waitFor result) //wait for a result
-
+        lock result (fun () -> if !result = None then waitFor result) //wait for a result
+        prStr "got a result and doing finish" ""
         for x in (!suffQueue) do
             (!clients).[x].TellResult (Option.get !result) //tell sufficiencies the result
+        prStr "got past telling sufficiencies" ""
         if lastKnownCoord.[!lab] = clientID then do prStr "Releases because we're done" "";this.releaseLab (!lab) //we are done - release the lab if we own it
         result
 
