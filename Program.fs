@@ -428,23 +428,24 @@ type client (clientID, numLabs) =
     member this.addToQueue labID clID = lock queue <| fun () ->  if lastKnownCoord.[labID] <> this.ClientID then do //forward message
                                                                     Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID}) //let function finish when calling
                                                                  else 
-                                                                    let nQueue = (!queue)@[clID]
-                                                                    ignore (pr (sprintf "Added %d to lab %d" clID labID ) nQueue)
                                                                     if this.ClientID = clID then do//asking ourselves? 
-                                                                         queue:= nQueue
-                                                                         this.useLab labID //just use the lab, dont inform others - they should already know
+                                                                         ignore (pr (sprintf "going to add %d for lab %d" clID labID) (!queue))
+                                                                         if List.isEmpty !queue then
+                                                                             queue:= (!queue)@[clID]
+                                                                             ignore (pr (sprintf "added %d for lab %d" clID labID) (!queue)) 
+                                                                             this.useLab labID //just use the lab, dont inform others - they should already know
                                                                     else 
                                                                          match (!queue) with
-                                                                         | h::t -> queue:= nQueue //appending to Q
-                                                                         | [] -> queue:= nQueue //appending to Q and releasing
-                                                                                 this.releaseLab labID
+                                                                         | h::t -> queue:= (!queue)@[clID];ignore (pr (sprintf "added %d for lab %d" clID labID) (!queue))  //appending to Q
+                                                                         | [] -> queue:= [clID] //appending to Q and releasing
+                                                                                 ignore (pr (sprintf "added %d for lab %d" clID labID) (!queue)) 
+                                                                                 this.releaseLab labID false
                                       
     ///allows clients to cancel their requests
-    member this.cancelMyRequest labID clID = if clID <> this.ClientID then lock queue (fun () -> //dont remove ourselves from the queue
-                                                                         if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
-                                                                              Async.Start(async{(!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID})
-                                                                         else queue := [ for cl in !queue do if not(cl = clID) then yield cl ]                                                              
-                                                                              wakeWaiters queue)
+    member this.cancelMyRequest labID clID = if clID <> this.ClientID then lock queue <| fun () -> //dont remove ourselves from the queue
+                                                                                                   if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
+                                                                                                          Async.Start(async{(!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID})
+                                                                                                   else queue := [ for cl in !queue do if not(cl = clID) then yield cl ]
     
     ///update our mapping
     member this.updateHolder labID clID = Array.set lastKnownCoord labID clID
@@ -453,7 +454,7 @@ type client (clientID, numLabs) =
     member private this.addMeToQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
                                                     (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
     /// checks whether someone is willing to accept a lab
-    member private this.willingToAccept () = not(!ownALab)
+    member private this.willingToAccept () = lock ownALab <| fun () -> not(!ownALab)
     member this.setWaitForResult () = lock ownALab <| fun() -> if this.willingToAccept() then 
                                                                     ownALab := true; 
                                                                     Async.Start(async{this.removeFromQueues()})
@@ -465,14 +466,12 @@ type client (clientID, numLabs) =
         lock ownALab <| fun() ->
             if this.willingToAccept() then
                 ownALab := true
-                lock queue (fun () -> 
-                    //if !haveExpr then do    -- we shouldnt be given a lab unless we wanted it
-                    Array.set lastKnownCoord lab clientID //I am the owner now!
-                    ignore( pr "Last Known" lastKnownCoord )
-                    queue := que
-                    //inform those under me that i am their overlord now
-                    for x in (!queue) do ignore((!clients).[x].updateHolder lab clientID)
-                    wakeWaiters queue)
+                lock queue <| fun () -> //if !haveExpr then do    -- we shouldnt be given a lab unless we wanted it
+                                        Array.set lastKnownCoord lab clientID //I am the owner now!
+                                        ignore( pr "Last Known" lastKnownCoord )
+                                        queue := que
+                                        //inform those under me that i am their overlord now
+                                        for x in (!queue) do ignore((!clients).[x].updateHolder lab clientID)
                 //cancel my requests
                 Async.Start(async{
                     prStr "Removing myself from queues" ""
@@ -486,18 +485,20 @@ type client (clientID, numLabs) =
                 false
     
     ///releases a lab    
-    member private this.releaseLab labID =  lock queue (fun () -> queue := List.tail (!queue)
-                                                                  match (!queue) with
-                                                                  | h :: t -> if (!clients).[h].acceptOwnership labID (!queue) then do
-                                                                                  ignore( pr "Queue when releasing" queue )
-                                                                                  ignore(this.updateHolder labID h)
-                                                                                  lock ownALab <| fun() -> ownALab := false
-                                                                              else
-                                                                                 this.releaseLab labID
-                                                                  | [] -> ()) //do nothing
+    member private this.releaseLab labID removeMe =  lock queue <| fun () -> 
+                                                                    if removeMe then
+                                                                        queue := List.tail (!queue) //if we own it - remove our selve from head
+                                                                    ignore( pr "Queue before releasing" queue )
+                                                                    match (!queue) with
+                                                                    | h :: t -> if (!clients).[h].acceptOwnership labID (!queue) then do
+                                                                                    ignore( pr "Queue when releasing" queue )
+                                                                                    ignore(this.updateHolder labID h)
+                                                                                    lock ownALab <| fun() -> ownALab := false
+                                                                                else
+                                                                                    this.releaseLab labID true
+                                                                    | [] -> () //do nothing - hold on
 
-    member private this.useLab labID = this.removeFromQueues()
-                                       (!expr) labID //run
+    member private this.useLab labID = Async.Start( async{this.removeFromQueues();(!expr) labID} ) //run
 
     member this.removeFromQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
                                                     (!clients).[lastKnownCoord.[n]].cancelMyRequest n this.ClientID
@@ -539,7 +540,9 @@ type client (clientID, numLabs) =
         for x in (!suffQueue) do
             (!clients).[x].TellResult (Option.get !result) //tell sufficiencies the result
         prStr "got past telling sufficiencies" ""
-        if lastKnownCoord.[!lab] = clientID then do prStr "Releases because we're done" "";this.releaseLab (!lab) //we are done - release the lab if we own it
+        if lastKnownCoord.[!lab] = clientID then do 
+            prStr "Releases because we're done" ""
+            this.releaseLab (!lab) true //we are done - release the lab if we own it
         result
 
 
