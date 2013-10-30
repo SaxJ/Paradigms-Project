@@ -440,7 +440,7 @@ type client (clientID, numLabs) =
                                                      Async.Start(async{this.useLab labID}) //just use the lab, dont inform others - they should already know
                                                 else 
                                                      queue:= (!queue)@[clID] //append to queue 
-                                                     if not(!haveExpr) then this.releaseLab labID 
+                                                     if not(!haveExpr) then prStr "Releases because we arent busy" ""; this.releaseLab labID 
                                                      //forward the message if it was not for us
                                                      wakeWaiters queue)
                                       
@@ -467,10 +467,7 @@ type client (clientID, numLabs) =
                               for x in (!queue) do ignore((!clients).[x].updateHolder lab clientID)
                               wakeWaiters queue)
         //cancel my requests
-        for n in 0 .. (Array.length(lastKnownCoord)-1) do
-            let id = lastKnownCoord.[n]
-            let cli = (!clients).[id]
-            cli.cancelMyRequest n clientID
+        this.removeFromQueues()
         (!expr) lab
     
     ///releases a lab    
@@ -505,9 +502,11 @@ type client (clientID, numLabs) =
         let doOnOwner = (fun id -> lock queue <| fun () -> recursiveSuffice clientID (!labs).[id].Rules exp
                                                            (!labs).[id].DoExp delay exp clientID (fun res -> 
                                                                 lock haveExpr (fun () -> 
+                                                                    prStr "doOnOwner" ""
                                                                     result := Some res; lab := id; haveExpr := false; wakeWaiters haveExpr)))
 
-        let onToldResult = fun res ->   lock haveExpr (fun () -> 
+        let onToldResult = fun res ->   lock haveExpr (fun () ->
+                                            prStr "onToldResult" "" 
                                             result := Some res; haveExpr := false; wakeWaiters haveExpr)
 
         let onSuffice = false
@@ -522,7 +521,7 @@ type client (clientID, numLabs) =
 
         for x in 0 .. Array.length suffQueue-1 do
             if suffQueue.[x] then do (!clients).[x].TellResult result
-        if (!lab) <> -1 then do this.releaseLab (!lab) //we are done - release the lab if we own it
+        if (!lab) <> -1 then do prStr "Releases because we're done" "";this.releaseLab (!lab) //we are done - release the lab if we own it
         result
 
 
