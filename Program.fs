@@ -456,7 +456,11 @@ type client (clientID, numLabs) =
                                                     (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
     /// checks whether someone is willing to accept a lab
     member this.willingToAccept () = not((!ownALab))
-    member this.setWaitForResult () = ownALab := true
+    member this.setWaitForResult () = if this.willingToAccept() then 
+                                         ownALab := true; 
+                                         Async.Start(async{this.removeFromQueues()})
+                                         true //we will wait - no worries
+                                      else false //get lost, i already have a lab
  
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
@@ -501,29 +505,27 @@ type client (clientID, numLabs) =
     member this.DoExp delay exp =
         let result = ref None
         let lab = ref 0
-        let suffQueue = Array.init (Array.length (!clients)) (fun i -> false)
+        let suffQueue = ref []
         // the function called when this client becomes lab master. Executes the lab DoExp, with a continuation that assigns the result and wakes
         // waiters when the lab is done.
 
-        let rec recursiveSuffice origCaller rules ex = for clID in !queue do
-                                                            if not(suffQueue.[clID]) then
-                                                                let clExp = (!clients).[clID].getExpr()
-                                                                if (suffices rules (ex, clExp)) then (!clients).[clID].setWaitForResult()
-                                                                                                     Array.set suffQueue clID true
-                                                                                                     recursiveSuffice clID rules clExp
+        //build a list of those we suffice for and see if they are happy to wait
+        let recursiveSuffice rules ex = [for clID in !queue do
+                                             let clExp = (!clients).[clID].getExpr()
+                                             //yield if suffices and willing to wait for a result
+                                             if (suffices rules (ex, clExp)) then if (!clients).[clID].setWaitForResult() then yield clID]
 
-        let doOnOwner = (fun id -> lock queue <| fun () -> //recursiveSuffice clientID (!labs).[id].Rules exp
-                                                           //for x in 0 .. Array.length suffQueue-1 do
-                                                           //     if suffQueue.[x] then do (!clients).[x].setWaitForResult()
-                                                           //                              Async.Start(async{(!clients).[x].removeFromQueues()})
+        //run when an owner runs an experiment
+        let doOnOwner = (fun id -> lock queue <| fun () -> suffQueue := recursiveSuffice (!labs).[id].Rules exp
                                                            (!labs).[id].DoExp delay exp clientID (fun res -> 
                                                                 lock result (fun () -> 
                                                                     prStr "doOnOwner" ""
                                                                     result := Some res; lab := id; wakeWaiters result)))
-
+        //run when a client recieves a result from another client (who suffices)
         let onToldResult = fun res ->   lock result (fun () ->
                                             prStr "onToldResult" "" 
-                                            result := Some res; wakeWaiters result)
+                                            //give us th result, we don't have a lab anymore (free to make/accept requests)
+                                            result := Some res; ownALab := false; wakeWaiters result)
         
         expr := doOnOwner
         tellResult := onToldResult
@@ -531,10 +533,10 @@ type client (clientID, numLabs) =
 
         this.addMeToQueues();
         
-        lock result (fun () -> waitFor result)
+        lock result (fun () -> waitFor result) //wait for a result
 
-        for x in 0 .. Array.length suffQueue-1 do
-            if suffQueue.[x] then do (!clients).[x].TellResult (Option.get !result)
+        for x in (!suffQueue) do
+            (!clients).[x].TellResult (Option.get !result) //tell sufficiencies the result
         if lastKnownCoord.[!lab] = clientID then do prStr "Releases because we're done" "";this.releaseLab (!lab) //we are done - release the lab if we own it
         result
 
