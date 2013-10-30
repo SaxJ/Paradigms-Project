@@ -409,15 +409,9 @@ type client (clientID, numLabs) =
     let prStr (pre:string) str = prIndStr clientID (sprintf "Client%d: %s" clientID pre) str 
     let pr (pre:string) res = prStr pre (sprintf "%A" res); res
     
-    ///for printing lock state  1 is attempt, 2 is locked, 3 is release
-    let prLock objectName funcname state = match state with
-                                           | 1 -> prStr "Attemping to lock" (sprintf "%s in %s" objectName funcname)
-                                           | 2 -> prStr "Locked" (sprintf "%s in %s" objectName funcname)
-                                           | 3 -> prStr "Released" (sprintf "%s in %s" objectName funcname)
-                                           | _ -> ()
-    
     ///holds the list of people waiting to use my lab
     let queue = ref []
+    let ownALab = ref (clientID < numLabs)
     
     ///holds the experiment function to be run when I get the lab
     let (expr:(int -> unit) ref) = ref (fun _ -> ())
@@ -447,7 +441,7 @@ type client (clientID, numLabs) =
     ///allows clients to cancel their requests
     member this.cancelMyRequest labID clID = lock queue (fun () -> 
                                                      if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
-                                                                Async.Start(async{(!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID})
+                                                          Async.Start(async{(!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID})
                                                      else queue := [ for cl in !queue do if not(cl = clID) then yield cl ]                                                              
                                                           wakeWaiters queue)
     
@@ -455,13 +449,17 @@ type client (clientID, numLabs) =
     member this.updateHolder labID clID = Array.set lastKnownCoord labID clID
     
     ///function to add yourself to all the lab queues
-    member private this.addMeToQueues () = lock lastKnownCoord (fun () -> for n in 0 .. (Array.length(lastKnownCoord)-1) do 
-                                                                               (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID)
+    member private this.addMeToQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
+                                                (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
+    /// checks whether someone is willing to accept a lab
+    member this.willingToAccept () = not((!ownALab))
  
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
+        ownALab := true
         //if !haveExpr then do    -- we shouldnt be given a lab unless we wanted it
         Array.set lastKnownCoord lab clientID //I am the owner now!
+        ignore( pr "Last Known" lastKnownCoord )
         lock queue (fun () -> queue := que
                               //inform those under me that i am their overlord now
                               for x in (!queue) do ignore((!clients).[x].updateHolder lab clientID)
@@ -472,8 +470,14 @@ type client (clientID, numLabs) =
     
     ///releases a lab    
     member private this.releaseLab labID =  lock queue (fun () -> match (!queue) with
-                                                                  | h :: t -> Async.Start(async{(!clients).[h].acceptOwnership labID t})
-                                                                              ignore(this.updateHolder labID h)
+                                                                  | h :: t -> let acceptance = (!clients).[h].willingToAccept()
+                                                                              if acceptance then do
+                                                                                  Async.Start(async{(!clients).[h].acceptOwnership labID t})
+                                                                                  ignore(this.updateHolder labID h)
+                                                                                  ownALab := false
+                                                                              else
+                                                                                 queue := t
+                                                                                 this.releaseLab labID
                                                                   | [] -> ())
 
     member private this.useLab labID = for n in 0 .. (Array.length(lastKnownCoord)-1) do
@@ -482,8 +486,8 @@ type client (clientID, numLabs) =
                                             cli.cancelMyRequest n clientID
                                        (!expr) labID //run
 
-    member this.removeFromQueues () = lock lastKnownCoord (fun () -> for n in 0 .. (Array.length(lastKnownCoord)-1) do 
-                                                                        (!clients).[lastKnownCoord.[n]].cancelMyRequest n this.ClientID)
+    member this.removeFromQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
+                                            (!clients).[lastKnownCoord.[n]].cancelMyRequest n this.ClientID
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =
@@ -520,7 +524,7 @@ type client (clientID, numLabs) =
         lock haveExpr (fun () -> waitFor haveExpr)
 
         for x in 0 .. Array.length suffQueue-1 do
-            if suffQueue.[x] then do (!clients).[x].TellResult result
+            if suffQueue.[x] then do (!clients).[x].TellResult (Option.get !result)
         if lastKnownCoord.[!lab] = clientID then do prStr "Releases because we're done" "";this.releaseLab (!lab) //we are done - release the lab if we own it
         result
 
