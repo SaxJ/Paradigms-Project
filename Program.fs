@@ -531,7 +531,7 @@ type client (clientID, numLabs) =
         let onToldResult = fun res ->   lock result (fun () ->
                                             prStr "onToldResult" "" 
                                             //give us th result, we don't have a lab anymore (free to make/accept requests)
-                                            result := Some res; lock ownALab (fun() -> ownALab := false); wakeWaiters result)
+                                            result := Some res; wakeWaiters result)
         
         expr := doOnOwner
         tellResult := onToldResult
@@ -547,6 +547,8 @@ type client (clientID, numLabs) =
         if lastKnownCoord.[!lab] = clientID then do 
             prStr "Releases because we're done" ""
             this.releaseLab (!lab) true //we are done - release the lab if we own it
+        else 
+            lock ownALab (fun() -> ownALab := false);
         result
 
 
