@@ -470,11 +470,13 @@ type client (clientID, numLabs) =
             for x in (!queue) do ignore((!clients).[x].updateHolder lab clientID)
             wakeWaiters queue)
         //cancel my requests
-        prStr "Removing myself from queues" ""
-        this.removeFromQueues()
-        prStr "Done removing myself - will do stuff now" ""
-        //do some stuff
-        (!expr) lab
+        Async.Start(async{
+            prStr "Removing myself from queues" ""
+            this.removeFromQueues()
+            prStr "Done removing myself - will do stuff now" ""
+            //do some stuff
+            (!expr) lab
+        })
     
     ///releases a lab    
     member private this.releaseLab labID =  lock queue (fun () -> ignore( pr "Queue when releasing" queue )
