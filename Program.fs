@@ -349,7 +349,7 @@ type lab (labID, rules) =
     //  when it is complete.
     member this.DoExp delay (exp:exp) clID (continuation : bool->unit) =  
        startThread ("Lab"+ string labID) <| fun ()->
-          if !busy then  let str = sprintf "BANG! Sorry %d but lab%d explodes - host%d is already using it" clID labID (!usingClID).Value
+          if !busy then  let str = sprintf "BANG! lab%d explodes - host%d is already using it" labID (!usingClID).Value
                          prStamp -1 str "" //; failwith str // uncomment this to have the whole program fail.
           usingClID := Some clID              
           busy:=true
