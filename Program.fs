@@ -465,6 +465,7 @@ type client (clientID, numLabs) =
             wakeWaiters queue)
         //cancel my requests
         this.removeFromQueues()
+        //do some stuff
         (!expr) lab
     
     ///releases a lab    
@@ -472,7 +473,6 @@ type client (clientID, numLabs) =
                                                                   match (!queue) with
                                                                   | h :: t -> let acceptance = (!clients).[h].willingToAccept()
                                                                               if acceptance then do
-                                                                                  let fin = ref false;
                                                                                   (!clients).[h].acceptOwnership labID t
                                                                                   ignore(this.updateHolder labID h)
                                                                                   ownALab := false
@@ -519,9 +519,8 @@ type client (clientID, numLabs) =
         expr := doOnOwner
         tellResult := onToldResult
         experiment := exp
-        this.addMeToQueues()
         
-        lock result (fun () -> waitFor result)
+        lock result (fun () -> this.addMeToQueues(); waitFor result)
 
         for x in 0 .. Array.length suffQueue-1 do
             if suffQueue.[x] then do (!clients).[x].TellResult (Option.get !result)
