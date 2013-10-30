@@ -425,34 +425,38 @@ type client (clientID, numLabs) =
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs                    
         
     ///allows clients to request that they be added to the queue
-    member this.addToQueue labID clID = lock queue <| fun () ->  if lastKnownCoord.[labID] <> this.ClientID then do //forward message
-                                                                    Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID}) //let function finish when calling
-                                                                 else 
-                                                                    if this.ClientID = clID then do//asking ourselves? 
-                                                                         ignore (pr (sprintf "going to add %d for lab %d" clID labID) (!queue))
-                                                                         if List.isEmpty !queue then
-                                                                             queue:= (!queue)@[clID]
-                                                                             ignore (pr (sprintf "added %d for lab %d" clID labID) (!queue)) 
-                                                                             this.useLab labID //just use the lab, dont inform others - they should already know
-                                                                    else 
-                                                                         match (!queue) with
-                                                                         | h::t -> queue:= (!queue)@[clID];ignore (pr (sprintf "added %d for lab %d" clID labID) (!queue))  //appending to Q
-                                                                         | [] -> queue:= [clID] //appending to Q and releasing
-                                                                                 ignore (pr (sprintf "added %d for lab %d" clID labID) (!queue)) 
-                                                                                 this.releaseLab labID false
+    member this.addToQueue labID clID lst = lock queue <| fun () ->  if lastKnownCoord.[labID] <> this.ClientID then do //forward message
+                                                                                Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID (clientID::lst)}) //let function finish when calling
+                                                                     else 
+                                                                                if this.ClientID = clID then do//asking ourselves? 
+                                                                                        ignore (pr (sprintf "going to add %d for lab %d" clID labID) (!queue))
+                                                                                        if List.isEmpty !queue then
+                                                                                            queue:= (!queue)@[clID]
+                                                                                            ignore (pr (sprintf "added %d for lab %d" clID labID) (!queue)) 
+                                                                                            this.useLab labID //just use the lab, dont inform others - they should already know
+                                                                                else 
+                                                                                        for fwdr in lst do (!clients).[fwdr].updateHolder labID clientID
+                                                                                        match (!queue) with
+                                                                                        | h::t -> queue:= (!queue)@[clID];ignore (pr (sprintf "added %d for lab %d" clID labID) (!queue))  //appending to Q
+                                                                                        | [] -> queue:= [clID] //appending to Q and releasing
+                                                                                                ignore (pr (sprintf "added %d for lab %d" clID labID) (!queue)) 
+                                                                                                this.releaseLab labID false
                                       
     ///allows clients to cancel their requests
-    member this.cancelMyRequest labID clID = if clID <> this.ClientID then lock queue <| fun () -> //dont remove ourselves from the queue
+    member this.cancelMyRequest labID clID lst = if clID <> this.ClientID then lock queue <| fun () -> //dont remove ourselves from the queue
                                                                                                    if lastKnownCoord.[labID] <> this.ClientID then do //forward the message
-                                                                                                          Async.Start(async{(!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID})
+                                                                                                          Async.Start(async{(!clients).[lastKnownCoord.[labID]].cancelMyRequest labID clID (clientID::lst)})
                                                                                                    else queue := [ for cl in !queue do if not(cl = clID) then yield cl ]
+                                                                                                        for fwdr in lst do (!clients).[fwdr].updateHolder labID clientID
+
     
     ///update our mapping
     member this.updateHolder labID clID = Array.set lastKnownCoord labID clID
     
     ///function to add yourself to all the lab queues
     member private this.addMeToQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
-                                                    (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
+                                                    (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID [clientID]
+
     /// checks whether someone is willing to accept a lab
     member private this.willingToAccept () = lock ownALab <| fun () -> not(!ownALab)
     member this.setWaitForResult () = lock ownALab <| fun() -> if this.willingToAccept() then 
@@ -501,7 +505,7 @@ type client (clientID, numLabs) =
     member private this.useLab labID = Async.Start( async{this.removeFromQueues();(!expr) labID} ) //run
 
     member this.removeFromQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
-                                                    (!clients).[lastKnownCoord.[n]].cancelMyRequest n this.ClientID
+                                                    (!clients).[lastKnownCoord.[n]].cancelMyRequest n this.ClientID [clientID]
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =
