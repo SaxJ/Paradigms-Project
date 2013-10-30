@@ -542,6 +542,7 @@ type client (clientID, numLabs) =
         lock result (fun () -> if !result = None then waitFor result) //wait for a result
         prStr "got a result and doing finish" ""
         lock ownALab <| fun () ->
+            ignore(pr "SuffQueue" suffQueue) 
             for x in (!suffQueue) do
                 (!clients).[x].TellResult (Option.get !result) //tell sufficiencies the result
             prStr "got past telling sufficiencies" ""
