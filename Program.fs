@@ -417,6 +417,7 @@ type client (clientID, numLabs) =
     let (expr:(int -> unit) ref) = ref (fun _ -> ())
     let tellResult = ref (fun _ -> ())
     let experiment = ref A
+    let addingOrRemoving = ref false
 
     member this.TellResult res = (!tellResult) res
     member this.getExpr () = (!experiment)
@@ -446,8 +447,9 @@ type client (clientID, numLabs) =
     member this.updateHolder labID clID = Array.set lastKnownCoord labID clID
     
     ///function to add yourself to all the lab queues
-    member private this.addMeToQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
-                                                (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
+    member private this.addMeToQueues () = lock addingOrRemoving <| fun() ->
+                                                for n in 0 .. (Array.length(lastKnownCoord)-1) do 
+                                                    (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
     /// checks whether someone is willing to accept a lab
     member this.willingToAccept () = not((!ownALab))
     member this.setWaitForResult () = ownALab := true
@@ -485,8 +487,8 @@ type client (clientID, numLabs) =
     member private this.useLab labID = this.removeFromQueues()
                                        (!expr) labID //run
 
-    member this.removeFromQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
-                                            (!clients).[lastKnownCoord.[n]].cancelMyRequest n this.ClientID
+    member this.removeFromQueues () = lock addingOrRemoving <| fun() -> for n in 0 .. (Array.length(lastKnownCoord)-1) do 
+                                                                            (!clients).[lastKnownCoord.[n]].cancelMyRequest n this.ClientID
 
     /// This will be called each time a scientist on this host wants to submit an experiment.
     member this.DoExp delay exp =
@@ -519,8 +521,10 @@ type client (clientID, numLabs) =
         expr := doOnOwner
         tellResult := onToldResult
         experiment := exp
+
+        this.addMeToQueues();
         
-        lock result (fun () -> this.addMeToQueues(); waitFor result)
+        lock result (fun () -> waitFor result)
 
         for x in 0 .. Array.length suffQueue-1 do
             if suffQueue.[x] then do (!clients).[x].TellResult (Option.get !result)
