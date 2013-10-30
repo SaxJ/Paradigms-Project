@@ -412,6 +412,7 @@ type client (clientID, numLabs) =
     ///holds the list of people waiting to use my lab
     let queue = ref []
     let ownALab = ref (clientID < numLabs)
+    let usingLab = ref false
     
     ///holds the experiment function to be run when I get the lab
     let (expr:(int -> unit) ref) = ref (fun _ -> ())
@@ -431,9 +432,11 @@ type client (clientID, numLabs) =
                                                 Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID}) //let function finish when calling
                                              else 
                                                 if this.ClientID = clID then do//asking ourselves? 
+                                                     usingLab := true
                                                      this.useLab labID //just use the lab, dont inform others - they should already know
                                                 else 
                                                      queue:= (!queue)@[clID] //append to queue 
+                                                     if not((!usingLab)) then this.releaseLab labID
                                                      wakeWaiters queue)
                                       
     ///allows clients to cancel their requests
@@ -457,6 +460,7 @@ type client (clientID, numLabs) =
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
         ownALab := true
+        usingLab := true
         lock queue (fun () -> 
             //if !haveExpr then do    -- we shouldnt be given a lab unless we wanted it
             Array.set lastKnownCoord lab clientID //I am the owner now!
@@ -482,7 +486,7 @@ type client (clientID, numLabs) =
                                                                                  queue := t
                                                                                  this.releaseLab labID
                                                                   //release the lab once somebody wants it
-                                                                  | [] -> waitFor queue; this.releaseLab labID)
+                                                                  | [] -> usingLab := false)
 
     member private this.useLab labID = this.removeFromQueues()
                                        (!expr) labID //run
