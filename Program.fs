@@ -417,7 +417,6 @@ type client (clientID, numLabs) =
     let (expr:(int -> unit) ref) = ref (fun _ -> ())
     let tellResult = ref (fun _ -> ())
     let experiment = ref A
-    let addingOrRemoving = ref false
 
     member this.TellResult res = (!tellResult) res
     member this.getExpr () = (!experiment)
@@ -426,21 +425,19 @@ type client (clientID, numLabs) =
     member this.InitClients theClients theLabs =  clients:=theClients; labs:=theLabs                    
         
     ///allows clients to request that they be added to the queue
-    member this.addToQueue labID clID = lock queue (fun () -> 
-                                             if lastKnownCoord.[labID] <> this.ClientID then do //forward message
-                                                Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID}) //let function finish when calling
-                                             else 
-                                                let nQueue = (!queue)@[clID]
-                                                ignore (pr (sprintf "Added %d to lab %d" clID labID ) nQueue)
-                                                if this.ClientID = clID then do//asking ourselves? 
-                                                     queue:= nQueue
-                                                     this.useLab labID //just use the lab, dont inform others - they should already know
-                                                else 
-                                                     match (!queue) with
-                                                     | h::t -> queue:= nQueue //appending to Q
-                                                     | [] -> queue:= nQueue //appending to Q and releasing
-                                                             this.releaseLab labID
-                                                     wakeWaiters queue)
+    member this.addToQueue labID clID = lock queue <| fun () ->  if lastKnownCoord.[labID] <> this.ClientID then do //forward message
+                                                                    Async.Start(async{(!clients).[lastKnownCoord.[labID]].addToQueue labID clID}) //let function finish when calling
+                                                                 else 
+                                                                    let nQueue = (!queue)@[clID]
+                                                                    ignore (pr (sprintf "Added %d to lab %d" clID labID ) nQueue)
+                                                                    if this.ClientID = clID then do//asking ourselves? 
+                                                                         queue:= nQueue
+                                                                         this.useLab labID //just use the lab, dont inform others - they should already know
+                                                                    else 
+                                                                         match (!queue) with
+                                                                         | h::t -> queue:= nQueue //appending to Q
+                                                                         | [] -> queue:= nQueue //appending to Q and releasing
+                                                                                 this.releaseLab labID
                                       
     ///allows clients to cancel their requests
     member this.cancelMyRequest labID clID = if clID <> this.ClientID then lock queue (fun () -> //dont remove ourselves from the queue
@@ -456,42 +453,45 @@ type client (clientID, numLabs) =
     member private this.addMeToQueues () = for n in 0 .. (Array.length(lastKnownCoord)-1) do 
                                                     (!clients).[lastKnownCoord.[n]].addToQueue n this.ClientID
     /// checks whether someone is willing to accept a lab
-    member this.willingToAccept () = not((!ownALab))
-    member this.setWaitForResult () = if this.willingToAccept() then 
-                                         ownALab := true; 
-                                         Async.Start(async{this.removeFromQueues()})
-                                         true //we will wait - no worries
-                                      else false //get lost, i already have a lab
+    member private this.willingToAccept () = not(!ownALab)
+    member this.setWaitForResult () = lock ownALab <| fun() -> if this.willingToAccept() then 
+                                                                    ownALab := true; 
+                                                                    Async.Start(async{this.removeFromQueues()})
+                                                                    true //we will wait - no worries
+                                                               else false //get lost, i already have a lab
  
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
-        ownALab := true
-        lock queue (fun () -> 
-            //if !haveExpr then do    -- we shouldnt be given a lab unless we wanted it
-            Array.set lastKnownCoord lab clientID //I am the owner now!
-            ignore( pr "Last Known" lastKnownCoord )
-            queue := que
-            //inform those under me that i am their overlord now
-            for x in (!queue) do ignore((!clients).[x].updateHolder lab clientID)
-            wakeWaiters queue)
-        //cancel my requests
-        Async.Start(async{
-            prStr "Removing myself from queues" ""
-            this.removeFromQueues()
-            prStr "Done removing myself - will do stuff now" ""
-            //do some stuff
-            (!expr) lab
-        })
+        lock ownALab <| fun() ->
+            if this.willingToAccept() then
+                ownALab := true
+                lock queue (fun () -> 
+                    //if !haveExpr then do    -- we shouldnt be given a lab unless we wanted it
+                    Array.set lastKnownCoord lab clientID //I am the owner now!
+                    ignore( pr "Last Known" lastKnownCoord )
+                    queue := que
+                    //inform those under me that i am their overlord now
+                    for x in (!queue) do ignore((!clients).[x].updateHolder lab clientID)
+                    wakeWaiters queue)
+                //cancel my requests
+                Async.Start(async{
+                    prStr "Removing myself from queues" ""
+                    this.removeFromQueues()
+                    prStr "Done removing myself - will do stuff now" ""
+                    //do some stuff
+                    (!expr) lab
+                })
+                true
+            else
+                false
     
     ///releases a lab    
     member private this.releaseLab labID =  lock queue (fun () -> queue := List.tail (!queue)
                                                                   match (!queue) with
-                                                                  | h :: t -> let acceptance = (!clients).[h].willingToAccept()
-                                                                              if acceptance then do
+                                                                  | h :: t -> if (!clients).[h].acceptOwnership labID (!queue) then do
                                                                                   ignore( pr "Queue when releasing" queue )
-                                                                                  (!clients).[h].acceptOwnership labID (!queue)
                                                                                   ignore(this.updateHolder labID h)
-                                                                                  ownALab := false
+                                                                                  lock ownALab <| fun() -> ownALab := false
                                                                               else
                                                                                  this.releaseLab labID
                                                                   | [] -> ()) //do nothing
@@ -526,7 +526,7 @@ type client (clientID, numLabs) =
         let onToldResult = fun res ->   lock result (fun () ->
                                             prStr "onToldResult" "" 
                                             //give us th result, we don't have a lab anymore (free to make/accept requests)
-                                            result := Some res; ownALab := false; wakeWaiters result)
+                                            result := Some res; lock ownALab (fun() -> ownALab := false); wakeWaiters result)
         
         expr := doOnOwner
         tellResult := onToldResult
