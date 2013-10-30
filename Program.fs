@@ -349,7 +349,7 @@ type lab (labID, rules) =
     //  when it is complete.
     member this.DoExp delay (exp:exp) clID (continuation : bool->unit) =  
        startThread ("Lab"+ string labID) <| fun ()->
-          if !busy then  let str = sprintf "BANG! lab%d explodes - host%d is already using it" labID (!usingClID).Value
+          if !busy then  let str = sprintf "BANG! Sorry %d but lab%d explodes - host%d is already using it" clID labID (!usingClID).Value
                          prStamp -1 str "" //; failwith str // uncomment this to have the whole program fail.
           usingClID := Some clID              
           busy:=true
@@ -458,19 +458,21 @@ type client (clientID, numLabs) =
     /// called when you're being told to take a lab
     member this.acceptOwnership lab que =
         ownALab := true
-        //if !haveExpr then do    -- we shouldnt be given a lab unless we wanted it
-        Array.set lastKnownCoord lab clientID //I am the owner now!
-        ignore( pr "Last Known" lastKnownCoord )
-        lock queue (fun () -> queue := que
-                              //inform those under me that i am their overlord now
-                              for x in (!queue) do ignore((!clients).[x].updateHolder lab clientID)
-                              wakeWaiters queue)
+        lock queue (fun () -> 
+            //if !haveExpr then do    -- we shouldnt be given a lab unless we wanted it
+            Array.set lastKnownCoord lab clientID //I am the owner now!
+            ignore( pr "Last Known" lastKnownCoord )
+            queue := que
+            //inform those under me that i am their overlord now
+            for x in (!queue) do ignore((!clients).[x].updateHolder lab clientID)
+            wakeWaiters queue)
         //cancel my requests
         this.removeFromQueues()
         (!expr) lab
     
     ///releases a lab    
-    member private this.releaseLab labID =  lock queue (fun () -> match (!queue) with
+    member private this.releaseLab labID =  lock queue (fun () -> ignore( pr "Queue when releasing" queue )
+                                                                  match (!queue) with
                                                                   | h :: t -> let acceptance = (!clients).[h].willingToAccept()
                                                                               if acceptance then do
                                                                                   Async.Start(async{(!clients).[h].acceptOwnership labID t})
@@ -502,10 +504,10 @@ type client (clientID, numLabs) =
                                                                                                      Array.set suffQueue clID true
                                                                                                      recursiveSuffice clID rules clExp
 
-        let doOnOwner = (fun id -> lock queue <| fun () -> recursiveSuffice clientID (!labs).[id].Rules exp
-                                                           for x in 0 .. Array.length suffQueue-1 do
-                                                                if suffQueue.[x] then do (!clients).[x].setWaitForResult()
-                                                                                         Async.Start(async{(!clients).[x].removeFromQueues()})
+        let doOnOwner = (fun id -> lock queue <| fun () -> //recursiveSuffice clientID (!labs).[id].Rules exp
+                                                           //for x in 0 .. Array.length suffQueue-1 do
+                                                           //     if suffQueue.[x] then do (!clients).[x].setWaitForResult()
+                                                           //                              Async.Start(async{(!clients).[x].removeFromQueues()})
                                                            (!labs).[id].DoExp delay exp clientID (fun res -> 
                                                                 lock haveExpr (fun () -> 
                                                                     prStr "doOnOwner" ""
